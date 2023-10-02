@@ -48,4 +48,6 @@ void ASExplosiveBarrel::Tick(float DeltaTime)
 void ASExplosiveBarrel::Explode(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	ForceComp->FireImpulse();
+	UE_LOG(LogTemp, Log, TEXT("FIRE"));
+	DrawDebugString(GetWorld(), Hit.ImpactPoint, TEXT("testDebug"), nullptr, FColor::White, 2.0f, true);
 }

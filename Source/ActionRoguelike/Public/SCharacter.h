@@ -16,6 +16,8 @@ class ACTIONROGUELIKE_API ASCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
+	FTransform ProjectileTransform();
+
 public:
 	// Sets default values for this character's properties
 	ASCharacter();
@@ -23,7 +25,13 @@ public:
 protected:
 
 	UPROPERTY(EditAnywhere, Category = "Attack")
-	TSubclassOf<AActor> ProjectileClass;
+	TSubclassOf<AActor> MagicProjectileClass;
+
+	UPROPERTY(EditAnywhere, Category = "Attack")
+	TSubclassOf<AActor> BlackHoleProjectileClass;
+
+	UPROPERTY(EditAnywhere, Category = "Attack")
+	TSubclassOf<AActor> TeleportProjectileClass;
 
 	UPROPERTY(EditAnywhere, Category = "Attack")
 	UAnimMontage* AttackAnim;
@@ -49,6 +57,15 @@ protected:
 
 	void PrimaryInteract();
 	void PrimaryAttack_TimeElapsed();
+
+	void SecondaryAttack();
+	void SecondaryAttack_TimeElapsed();
+
+	void Teleport();
+	void Teleport_TimeElapsed();
+
+	void ResetActiveTeleport();
+	static bool bActiveTeleport;
 
 public:	
 	// Called every frame

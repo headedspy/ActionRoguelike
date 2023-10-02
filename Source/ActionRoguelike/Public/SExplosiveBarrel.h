@@ -29,7 +29,7 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	UStaticMeshComponent* MeshComp;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	URadialForceComponent* ForceComp;
 
 	UFUNCTION()
