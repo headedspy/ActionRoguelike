@@ -7,11 +7,13 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
 #include "SInteractionComponent.h"
+#include "SAttributeComponent.h"
 
 #include "DrawDebugHelpers.h"
 #include "Kismet/KismetMathLibrary.h"
 
 bool ASCharacter::bActiveTeleport = false;
+bool ASCharacter::bActiveBlackHole = false;
 
 // Sets default values
 ASCharacter::ASCharacter()
@@ -30,6 +32,8 @@ ASCharacter::ASCharacter()
 	SpringArmComp->bUsePawnControlRotation = true;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	bUseControllerRotationYaw = false;
+
+	AttributeComp = CreateDefaultSubobject<USAttributeComponent>("AttributeComp");
 }
 
 // Called when the game starts or when spawned
@@ -62,7 +66,7 @@ void ASCharacter::PrimaryAttack()
 {
 	PlayAnimMontage(AttackAnim);
 
-	GetWorldTimerManager().SetTimer(TimerHandle, this, &ASCharacter::PrimaryAttack_TimeElapsed, 0.2f);
+	GetWorldTimerManager().SetTimer(TimerHandlePrimaryAttack, this, &ASCharacter::PrimaryAttack_TimeElapsed, 0.2f);
 }
 
 FTransform ASCharacter::ProjectileTransform() {
@@ -89,31 +93,43 @@ FTransform ASCharacter::ProjectileTransform() {
 
 void ASCharacter::PrimaryAttack_TimeElapsed()
 {
-	FTransform SpawnTM = ProjectileTransform();
+	if (ensureAlways(MagicProjectileClass)) {
+		FTransform SpawnTM = ProjectileTransform();
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	SpawnParams.Instigator = this;
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnParams.Instigator = this;
 
-	GetWorld()->SpawnActor<AActor>(MagicProjectileClass, SpawnTM, SpawnParams);
+		GetWorld()->SpawnActor<AActor>(MagicProjectileClass, SpawnTM, SpawnParams);
+	}
 }
 
 void ASCharacter::SecondaryAttack() 
 {
+	if (bActiveBlackHole) return;
+
+	bActiveBlackHole = true;
 	PlayAnimMontage(AttackAnim);
 
-	GetWorldTimerManager().SetTimer(TimerHandle, this, &ASCharacter::SecondaryAttack_TimeElapsed, 0.2f);
+	GetWorldTimerManager().SetTimer(TimerHandleSecondaryAttack, this, &ASCharacter::SecondaryAttack_TimeElapsed, 0.2f);
 }
 
-void ASCharacter::SecondaryAttack_TimeElapsed() 
+void ASCharacter::SecondaryAttack_TimeElapsed()
 {
-	FTransform SpawnTM = ProjectileTransform();
+	if (ensureAlways(BlackHoleProjectileClass)) {
+		FTransform SpawnTM = ProjectileTransform();
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	SpawnParams.Instigator = this;
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnParams.Instigator = this;
 
-	GetWorld()->SpawnActor<AActor>(BlackHoleProjectileClass, SpawnTM, SpawnParams);
+		GetWorld()->SpawnActor<AActor>(BlackHoleProjectileClass, SpawnTM, SpawnParams);
+		GetWorldTimerManager().SetTimer(TimerHandleSecondaryAttack, this, &ASCharacter::ResetActiveBlackHole, 5.0f);
+	}
+}
+
+void ASCharacter::ResetActiveBlackHole() {
+	bActiveBlackHole = false;
 }
 
 void ASCharacter::Teleport()
@@ -123,19 +139,21 @@ void ASCharacter::Teleport()
 	bActiveTeleport = true;
 	PlayAnimMontage(AttackAnim);
 
-	GetWorldTimerManager().SetTimer(TimerHandle, this, &ASCharacter::Teleport_TimeElapsed, 0.2f);
+	GetWorldTimerManager().SetTimer(TimerHandleTeleport, this, &ASCharacter::Teleport_TimeElapsed, 0.2f);
 }
 
 void ASCharacter::Teleport_TimeElapsed()
 {
-	FTransform SpawnTM = ProjectileTransform();
+	if (ensureAlways(TeleportProjectileClass)) {
+		FTransform SpawnTM = ProjectileTransform();
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	SpawnParams.Instigator = this;
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnParams.Instigator = this;
 
-	GetWorld()->SpawnActor<AActor>(TeleportProjectileClass, SpawnTM, SpawnParams);
-	GetWorldTimerManager().SetTimer(TimerHandle, this, &ASCharacter::ResetActiveTeleport, 2.0f);
+		GetWorld()->SpawnActor<AActor>(TeleportProjectileClass, SpawnTM, SpawnParams);
+		GetWorldTimerManager().SetTimer(TimerHandleTeleport, this, &ASCharacter::ResetActiveTeleport, 2.0f);
+	}
 }
 
 void ASCharacter::ResetActiveTeleport() {

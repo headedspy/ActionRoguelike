@@ -10,6 +10,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class USInteractionComponent;
 class UAnimMontage;
+class USAttributeComponent;
 
 UCLASS()
 class ACTIONROGUELIKE_API ASCharacter : public ACharacter
@@ -45,7 +46,12 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	USInteractionComponent* InteractionComp;
 
-	FTimerHandle TimerHandle;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	USAttributeComponent* AttributeComp;
+
+	FTimerHandle TimerHandlePrimaryAttack;
+	FTimerHandle TimerHandleSecondaryAttack;
+	FTimerHandle TimerHandleTeleport;
 
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -65,7 +71,10 @@ protected:
 	void Teleport_TimeElapsed();
 
 	void ResetActiveTeleport();
+	void ResetActiveBlackHole();
+
 	static bool bActiveTeleport;
+	static bool bActiveBlackHole;
 
 public:	
 	// Called every frame

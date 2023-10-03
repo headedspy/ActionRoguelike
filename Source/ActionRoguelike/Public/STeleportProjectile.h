@@ -20,6 +20,9 @@ class ACTIONROGUELIKE_API ASTeleportProjectile : public ASProjectileBase
 
 	void Teleport();
 
+	UFUNCTION()
+	void CollisionHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
 protected:
 
 	UPROPERTY(EditAnywhere)
