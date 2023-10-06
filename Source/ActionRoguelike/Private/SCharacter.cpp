@@ -167,6 +167,25 @@ void ASCharacter::PrimaryInteract()
 	}
 }
 
+void ASCharacter::OnHealthChange(AActor* InstigatorActor, USAttributeComponent* OwningComp, float NewHealth, float Delta)
+{
+	GetMesh()->SetScalarParameterValueOnMaterials("TimeToHit", GetWorld()->TimeSeconds);
+	GetMesh()->SetVectorParameterValueOnMaterials("FlashColor", FVector(1.0f, 0.0f, 0.0f));
+
+	if (NewHealth <= 0.0f && Delta < 0.0f)
+	{
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		DisableInput(PC);
+	}
+}
+
+void ASCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	AttributeComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChange);
+}
+
 // Called every frame
 void ASCharacter::Tick(float DeltaTime)
 {

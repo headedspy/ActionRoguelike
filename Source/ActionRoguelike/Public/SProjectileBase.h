@@ -9,8 +9,10 @@
 class USphereComponent;
 class UProjectileMovementComponent;
 class UParticleSystemComponent;
+class UAudioComponent;
+class USoundBase;
 
-UCLASS()
+UCLASS(ABSTRACT)
 class ACTIONROGUELIKE_API ASProjectileBase : public AActor
 {
 	GENERATED_BODY()
@@ -34,7 +36,13 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 		UParticleSystemComponent* ParticleSystemComp;
 
+	UPROPERTY(VisibleAnywhere)
+		UAudioComponent* AudioComp;
+
 	float ProjectileSpeed = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	USoundBase* ImpactSoundBase;
 
 public:	
 	// Called every frame

@@ -5,7 +5,7 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Components/SphereComponent.h"
 #include "Particles/ParticleSystemComponent.h"
-
+#include "Components/AudioComponent.h"
 
 // Sets default values
 ASProjectileBase::ASProjectileBase()
@@ -23,7 +23,10 @@ ASProjectileBase::ASProjectileBase()
 	ProjectileMovementComp->bInitialVelocityInLocalSpace = true;
 
 	ParticleSystemComp = CreateDefaultSubobject<UParticleSystemComponent>("ParticleSystemComp");
-	ParticleSystemComp->SetupAttachment(SphereComp);
+	ParticleSystemComp->SetupAttachment(RootComponent);
+
+	AudioComp = CreateDefaultSubobject<UAudioComponent>("AudioComp");
+	AudioComp->SetupAttachment(RootComponent);
 }
 
 // Called when the game starts or when spawned

@@ -76,6 +76,11 @@ protected:
 	static bool bActiveTeleport;
 	static bool bActiveBlackHole;
 
+	UFUNCTION()
+	void OnHealthChange(AActor* InstigatorActor, USAttributeComponent* OwningComp, float NewHealth, float Delta);
+
+	virtual void PostInitializeComponents() override;
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
