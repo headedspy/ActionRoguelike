@@ -32,6 +32,11 @@ void FNightButtonModule::StartupModule()
 		FExecuteAction::CreateRaw(this, &FNightButtonModule::PluginButtonClicked),
 		FCanExecuteAction());
 
+	PluginCommands->MapAction(
+		FNightButtonCommands::Get().PluginAction,
+		FExecuteAction::CreateRaw(this, &FNightButtonModule::PluginButtonClicked),
+		FCanExecuteAction());
+
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FNightButtonModule::RegisterMenus));
 }
 
@@ -72,7 +77,7 @@ void FNightButtonModule::PluginButtonClicked()
 		FMessageDialog::Open(EAppMsgType::Ok, DialogText);
 		FoundActor = AddActor(APostProcessVolume::StaticClass());
 	}
-	//Infinite Extent (Unbound)
+
 	APostProcessVolume* PostProcessVolume = Cast<APostProcessVolume>(FoundActor);
 	PostProcessVolume->Settings.AutoExposureBias = -3.0f;
 	PostProcessVolume->Settings.bOverride_AutoExposureBias = true;
