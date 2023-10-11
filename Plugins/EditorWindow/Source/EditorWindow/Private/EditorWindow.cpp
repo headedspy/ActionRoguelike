@@ -4,12 +4,16 @@
 #include "EditorWindowStyle.h"
 #include "EditorWindowCommands.h"
 #include "LevelEditor.h"
+#include "Framework/SlateDelegates.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SComboButton.h"
+#include "Widgets/Input/SButton.h"
+#include "Components/SplineComponent.h"
+#include "ProceduralRoom.h"
 #include "ToolMenus.h"
 
 static const FName EditorWindowTabName("EditorWindow");
@@ -60,9 +64,7 @@ TArray< TSharedPtr< FString > > ComboItems;
 
 TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	FText WidgetText = FText::FromString(
-		TEXT("One")
-		);
+	FText WidgetText = FText::FromString(TEXT("One"));
 
 
 	ComboItems.Add(MakeShareable(new FString(TEXT("One"))));
@@ -87,10 +89,6 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 			[
 				SNew(STextBlock)
 				.Text(WidgetText)
-			]
-			[
-				SNew(STextBlock)
-				.Text("bruh moment")
 			]
 			*/
 			SNew(SScrollBox)
@@ -176,6 +174,14 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 					]
 				]
 			]
+			+SScrollBox::Slot()
+			.Padding(10, 5)
+			[
+				SNew(SButton)
+				.Text(FText::FromString("Create room"))
+				.HAlign(HAlign_Center)
+				.OnClicked_Raw(this, &FEditorWindowModule::ButtonClicked)
+			]
 		];
 }
 
@@ -213,6 +219,35 @@ void FEditorWindowModule::ChangedState(ECheckBoxState newState)
 {
 	FText DialogText = FText::FromString("Changed state");
 	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+}
+
+AActor* FEditorWindowModule::AddActor(TSubclassOf<AActor> ActorClass, FTransform Transform)
+{
+	ULevel* Level = GEditor->GetEditorWorldContext().World()->GetCurrentLevel();
+	return GEditor->AddActor(Level, ActorClass, Transform);
+}
+
+
+FReply FEditorWindowModule::ButtonClicked()
+{
+	FText DialogText = FText::FromString("Button Clicked");
+	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+
+	FTransform Transform;
+	AActor* Curve = AddActor(AProceduralRoom::StaticClass(), Transform);
+
+	/*
+	AActor* Curve = AddActor(AActor::StaticClass(), Transform);
+	USplineComponent* SplineComponent = Cast<USplineComponent>(Curve->CreateDefaultSubobject<USplineComponent>("Spline"));
+	Curve->SetRootComponent(Cast<USceneComponent>(SplineComponent));
+
+	
+	SplineComponent->SetClosedLoop(true);
+	SplineComponent->AddSplineLocalPoint(FVector(300.0f, 0.0f, 0.0f));
+	SplineComponent->AddSplineLocalPoint(FVector(-300.0f, 200.0f, 0.0f));
+	*/
+
+	return FReply::Handled();
 }
 
 #undef LOCTEXT_NAMESPACE

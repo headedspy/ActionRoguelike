@@ -7,6 +7,7 @@
 
 class FToolBarBuilder;
 class FMenuBuilder;
+class FReply;
 
 class FEditorWindowModule : public IModuleInterface
 {
@@ -24,6 +25,10 @@ private:
 	void RegisterMenus();
 
 	void ChangedState(ECheckBoxState newState);
+
+	FReply ButtonClicked();
+
+	AActor* AddActor(TSubclassOf<AActor> ActorClass, FTransform Transform);
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
 

@@ -25,7 +25,7 @@ public class EditorWindow : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",
+				"Core"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -43,6 +43,7 @@ public class EditorWindow : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
+				"PCG"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
