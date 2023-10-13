@@ -5,6 +5,10 @@
 #include "PCGComponent.h"
 #include "PCGGraph.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include <Elements/PCGSplineSampler.h>
+#include <Elements/PCGStaticMeshSpawner.h>
+#include "UObject/ConstructorHelpers.h"
+#include <MeshSelectors/PCGMeshSelectorWeighted.h>
 
 // Sets default values
 AProceduralRoom::AProceduralRoom()
@@ -14,6 +18,7 @@ AProceduralRoom::AProceduralRoom()
 
 	SplineComponent = CreateDefaultSubobject<USplineComponent>("Spline");
 	RootComponent = SplineComponent;
+	PCGComponent = CreateDefaultSubobject<UPCGComponent>("PCG");
 
 	SplineComponent->SetClosedLoop(true);
 	SplineComponent->ClearSplinePoints();
@@ -25,16 +30,12 @@ AProceduralRoom::AProceduralRoom()
 	SplineComponent->SetSplinePointType(2, ESplinePointType::Constant);
 	SplineComponent->AddSplineLocalPoint(FVector(0.0f, 300.0f, 0.0f));
 	SplineComponent->SetSplinePointType(3, ESplinePointType::Constant);
-
-	PCGComponent = CreateDefaultSubobject<UPCGComponent>("PCG");
-	Graph = NewObject<UPCGGraph>();
 }
 
 // Called when the game starts or when spawned
 void AProceduralRoom::BeginPlay()
 {
 	Super::BeginPlay();
-	
 }
 
 // Called every frame
@@ -42,5 +43,40 @@ void AProceduralRoom::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+}
+
+void AProceduralRoom::InitializeGraph()
+{
+	Graph = NewObject<UPCGGraph>();
+	PCGComponent->SetGraphLocal(Graph);
+
+	UPCGSplineSamplerSettings* SplineSamplerNodeSettings = NewObject<UPCGSplineSamplerSettings>();
+	SplineSamplerNodeSettings->Params.Dimension = EPCGSplineSamplingDimension::OnInterior;
+
+	UPCGNode* SplineSamplerNode = Graph->AddNode(SplineSamplerNodeSettings);
+
+	//TODO: set mesh instance
+	UPCGStaticMeshSpawnerSettings* StaticMeshSpawnerSettings = NewObject<UPCGStaticMeshSpawnerSettings>();
+	UPCGMeshSelectorBase* MeshSelector = NewObject<UPCGMeshSelectorWeighted>();
+
+	FPCGContext Context;
+	UPCGSpatialData* SpatialData = nullptr;
+
+	TArray<FPCGMeshInstanceList> MeshInstances;
+	FCollisionProfileName CollisionProfileName;
+	TArray<UMaterialInterface*> MaterialOverrides;
+	MeshInstances.Add(FPCGMeshInstanceList(FloorMesh, false, CollisionProfileName, false, MaterialOverrides, 10.0f, 1000.0f));
+
+	UPCGPointData* OutPointData = nullptr;
+	MeshSelector->SelectInstances(Context, StaticMeshSpawnerSettings, SpatialData, MeshInstances, OutPointData);
+
+	StaticMeshSpawnerSettings->MeshSelectorInstance = MeshSelector;
+
+	UPCGNode* StaticMeshSpawnerNode = Graph->AddNode(StaticMeshSpawnerSettings);
+
+
+	Graph->AddLabeledEdge(Graph->GetInputNode(), FName("In"), SplineSamplerNode, FName("In"));
+	Graph->AddLabeledEdge(SplineSamplerNode, FName("Out"), StaticMeshSpawnerNode, FName("In"));
+	Graph->AddLabeledEdge(StaticMeshSpawnerNode, FName("Out"), Graph->GetOutputNode(), FName("Out"));
 }
 

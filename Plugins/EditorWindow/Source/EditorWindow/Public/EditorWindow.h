@@ -32,6 +32,12 @@ private:
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
 
+	UPROPERTY()
+	UStaticMesh* FloorMesh;
+
+	UPROPERTY()
+	IPropertyHandle* PropertyHandle;
+
 private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 };

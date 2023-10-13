@@ -43,7 +43,8 @@ public class EditorWindow : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-				"PCG"
+				"PCG",
+                "PropertyEditor"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

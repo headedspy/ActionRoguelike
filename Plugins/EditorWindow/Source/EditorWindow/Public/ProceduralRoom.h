@@ -26,14 +26,19 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	USplineComponent* SplineComponent;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UPCGComponent* PCGComponent;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UPCGGraph* Graph;
 
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+
+	void InitializeGraph();
+
+	UPROPERTY(EditAnywhere)
+	UStaticMesh* FloorMesh;
 
 };

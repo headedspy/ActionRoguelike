@@ -15,6 +15,8 @@
 #include "Components/SplineComponent.h"
 #include "ProceduralRoom.h"
 #include "ToolMenus.h"
+#include "Containers/StringFwd.h"
+#include "PropertyCustomizationHelpers.h"
 
 static const FName EditorWindowTabName("EditorWindow");
 
@@ -65,7 +67,7 @@ TArray< TSharedPtr< FString > > ComboItems;
 TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
 	FText WidgetText = FText::FromString(TEXT("One"));
-
+	FString FloorObjectPath;
 
 	ComboItems.Add(MakeShareable(new FString(TEXT("One"))));
 	ComboItems.Add(MakeShareable(new FString(TEXT("Two"))));
@@ -182,6 +184,28 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 				.HAlign(HAlign_Center)
 				.OnClicked_Raw(this, &FEditorWindowModule::ButtonClicked)
 			]
+			+SScrollBox::Slot()
+			.Padding(10,5)
+			[
+				//SNew(SPropertyValueWidget)
+				SNew(SObjectPropertyEntryBox)
+				.AllowedClass(UStaticMesh::StaticClass())
+				.DisplayBrowse(true)
+				.DisplayThumbnail(true)
+				.DisplayUseSelected(true)
+				.EnableContentPicker(true)
+				.AllowClear(false)
+				.OnObjectChanged_Lambda([this, FloorObjectPath](const FAssetData& Data) {
+					if (Data.IsValid())
+					{
+						//TODO:
+						//Put Data.ObjectPath.ToString() into the objectpath of the entrybox (check out what is propertyhandle)
+						FText DialogText = FText::FromString(Data.ObjectPath.ToString());
+						FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+					}
+				})
+				.ObjectPath("/Game/ParagonMinions/FX/Meshes/Shapes/SM_1MeterSphere_MultiUVs.SM_1MeterSphere_MultiUVs")
+			]
 		];
 }
 
@@ -234,7 +258,10 @@ FReply FEditorWindowModule::ButtonClicked()
 	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
 
 	FTransform Transform;
-	AActor* Curve = AddActor(AProceduralRoom::StaticClass(), Transform);
+
+	AProceduralRoom* Room = Cast<AProceduralRoom>(AddActor(AProceduralRoom::StaticClass(), Transform));
+
+	Room->InitializeGraph();
 
 	/*
 	AActor* Curve = AddActor(AActor::StaticClass(), Transform);
@@ -249,6 +276,7 @@ FReply FEditorWindowModule::ButtonClicked()
 
 	return FReply::Handled();
 }
+
 
 #undef LOCTEXT_NAMESPACE
 	
