@@ -40,4 +40,7 @@ private:
 
 private:
 	TSharedPtr<class FUICommandList> PluginCommands;
+
+	UPROPERTY()
+	FString FloorObjectPath;
 };

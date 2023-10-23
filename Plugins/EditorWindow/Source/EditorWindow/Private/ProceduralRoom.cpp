@@ -55,21 +55,18 @@ void AProceduralRoom::InitializeGraph()
 
 	UPCGNode* SplineSamplerNode = Graph->AddNode(SplineSamplerNodeSettings);
 
-	//TODO: set mesh instance
+
+
+
 	UPCGStaticMeshSpawnerSettings* StaticMeshSpawnerSettings = NewObject<UPCGStaticMeshSpawnerSettings>();
-	UPCGMeshSelectorBase* MeshSelector = NewObject<UPCGMeshSelectorWeighted>();
+	UPCGMeshSelectorWeighted* MeshSelector = NewObject<UPCGMeshSelectorWeighted>();
+	TArray<FPCGMeshSelectorWeightedEntry> MeshEntriesArray;
 
-	FPCGContext Context;
-	UPCGSpatialData* SpatialData = nullptr;
+	FPCGMeshSelectorWeightedEntry MeshEntry;
+	MeshEntry.Mesh = FloorMesh;
+	MeshEntriesArray.Add(MeshEntry);
 
-	TArray<FPCGMeshInstanceList> MeshInstances;
-	FCollisionProfileName CollisionProfileName;
-	TArray<UMaterialInterface*> MaterialOverrides;
-	MeshInstances.Add(FPCGMeshInstanceList(FloorMesh, false, CollisionProfileName, false, MaterialOverrides, 10.0f, 1000.0f));
-
-	UPCGPointData* OutPointData = nullptr;
-	MeshSelector->SelectInstances(Context, StaticMeshSpawnerSettings, SpatialData, MeshInstances, OutPointData);
-
+	MeshSelector->MeshEntries = MeshEntriesArray;
 	StaticMeshSpawnerSettings->MeshSelectorInstance = MeshSelector;
 
 	UPCGNode* StaticMeshSpawnerNode = Graph->AddNode(StaticMeshSpawnerSettings);
@@ -78,5 +75,7 @@ void AProceduralRoom::InitializeGraph()
 	Graph->AddLabeledEdge(Graph->GetInputNode(), FName("In"), SplineSamplerNode, FName("In"));
 	Graph->AddLabeledEdge(SplineSamplerNode, FName("Out"), StaticMeshSpawnerNode, FName("In"));
 	Graph->AddLabeledEdge(StaticMeshSpawnerNode, FName("Out"), Graph->GetOutputNode(), FName("Out"));
+
+	PCGComponent->Generate();
 }
 

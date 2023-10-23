@@ -67,7 +67,6 @@ TArray< TSharedPtr< FString > > ComboItems;
 TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
 	FText WidgetText = FText::FromString(TEXT("One"));
-	FString FloorObjectPath;
 
 	ComboItems.Add(MakeShareable(new FString(TEXT("One"))));
 	ComboItems.Add(MakeShareable(new FString(TEXT("Two"))));
@@ -187,7 +186,6 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 			+SScrollBox::Slot()
 			.Padding(10,5)
 			[
-				//SNew(SPropertyValueWidget)
 				SNew(SObjectPropertyEntryBox)
 				.AllowedClass(UStaticMesh::StaticClass())
 				.DisplayBrowse(true)
@@ -195,16 +193,13 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 				.DisplayUseSelected(true)
 				.EnableContentPicker(true)
 				.AllowClear(false)
-				.OnObjectChanged_Lambda([this, FloorObjectPath](const FAssetData& Data) {
+				.OnObjectChanged_Lambda([this](const FAssetData& Data) {
 					if (Data.IsValid())
 					{
-						//TODO:
-						//Put Data.ObjectPath.ToString() into the objectpath of the entrybox (check out what is propertyhandle)
-						FText DialogText = FText::FromString(Data.ObjectPath.ToString());
-						FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+						FloorObjectPath = Data.ObjectPath.ToString();
 					}
 				})
-				.ObjectPath("/Game/ParagonMinions/FX/Meshes/Shapes/SM_1MeterSphere_MultiUVs.SM_1MeterSphere_MultiUVs")
+				.ObjectPath_Lambda([this]() { return FloorObjectPath; })
 			]
 		];
 }
@@ -261,18 +256,10 @@ FReply FEditorWindowModule::ButtonClicked()
 
 	AProceduralRoom* Room = Cast<AProceduralRoom>(AddActor(AProceduralRoom::StaticClass(), Transform));
 
+	//TODO: error handing if mesh not found
+	Room->FloorMesh = Cast<UStaticMesh>(StaticLoadObject(UStaticMesh::StaticClass(), nullptr, *FloorObjectPath));
+
 	Room->InitializeGraph();
-
-	/*
-	AActor* Curve = AddActor(AActor::StaticClass(), Transform);
-	USplineComponent* SplineComponent = Cast<USplineComponent>(Curve->CreateDefaultSubobject<USplineComponent>("Spline"));
-	Curve->SetRootComponent(Cast<USceneComponent>(SplineComponent));
-
-	
-	SplineComponent->SetClosedLoop(true);
-	SplineComponent->AddSplineLocalPoint(FVector(300.0f, 0.0f, 0.0f));
-	SplineComponent->AddSplineLocalPoint(FVector(-300.0f, 200.0f, 0.0f));
-	*/
 
 	return FReply::Handled();
 }
