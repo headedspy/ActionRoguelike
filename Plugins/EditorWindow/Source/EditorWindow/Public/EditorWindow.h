@@ -26,21 +26,19 @@ private:
 
 	void ChangedState(ECheckBoxState newState);
 
-	FReply ButtonClicked();
+	FReply BuildButtonClicked();
+	FReply ReplaceButtonClicked();
 
 	AActor* AddActor(TSubclassOf<AActor> ActorClass, FTransform Transform);
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
 
 	UPROPERTY()
-	UStaticMesh* FloorMesh;
-
-	UPROPERTY()
-	IPropertyHandle* PropertyHandle;
+	UDataTable* DataTable;
 
 private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 
 	UPROPERTY()
-	FString FloorObjectPath;
+	FString DataTablePath;
 };

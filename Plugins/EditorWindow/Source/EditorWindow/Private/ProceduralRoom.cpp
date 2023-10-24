@@ -76,6 +76,21 @@ void AProceduralRoom::InitializeGraph()
 	Graph->AddLabeledEdge(SplineSamplerNode, FName("Out"), StaticMeshSpawnerNode, FName("In"));
 	Graph->AddLabeledEdge(StaticMeshSpawnerNode, FName("Out"), Graph->GetOutputNode(), FName("Out"));
 
+	/*
+	TSubclassOf<UPCGNode> LocalTransformNode;
+	static ConstructorHelpers::FClassFinder<UPCGNode> AssetFile(TEXT("Script/Engine.Blueprint'/PCG/BP_Elements/LocalTranslation.LocalTranslation'"));
+	if (AssetFile.Class != nullptr)
+	{
+		LocalTransformNode = AssetFile.Class;
+
+		UPCGNode* LocalTransformNode2 = Cast<UPCGNode>(LocalTransformNode);
+		Graph->AddNode(LocalTransformNode2);
+	}
+	*/
+
+	///Script/Engine.Blueprint'/PCG/BP_Elements/LocalTranslation.LocalTranslation'
+	//D:/UE_5.1/UE_5.1/Engine/Plugins/Experimental/PCG/Content/BP_Elements/LocalTranslation.uasset
+
 	PCGComponent->Generate();
 }
 

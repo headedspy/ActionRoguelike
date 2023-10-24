@@ -17,6 +17,9 @@
 #include "ToolMenus.h"
 #include "Containers/StringFwd.h"
 #include "PropertyCustomizationHelpers.h"
+#include "Engine/LevelStreamingDynamic.h"
+#include "Math/Rotator.h"
+#include "Engine/World.h"
 
 static const FName EditorWindowTabName("EditorWindow");
 
@@ -175,19 +178,27 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 					]
 				]
 			]
+			+ SScrollBox::Slot()
+				.Padding(10, 5)
+				[
+					SNew(SButton)
+					.Text(FText::FromString("Build"))
+				.HAlign(HAlign_Center)
+				.OnClicked_Raw(this, &FEditorWindowModule::BuildButtonClicked)
+				]
 			+SScrollBox::Slot()
 			.Padding(10, 5)
 			[
 				SNew(SButton)
-				.Text(FText::FromString("Create room"))
+				.Text(FText::FromString("Replace"))
 				.HAlign(HAlign_Center)
-				.OnClicked_Raw(this, &FEditorWindowModule::ButtonClicked)
+				.OnClicked_Raw(this, &FEditorWindowModule::ReplaceButtonClicked)
 			]
 			+SScrollBox::Slot()
 			.Padding(10,5)
 			[
 				SNew(SObjectPropertyEntryBox)
-				.AllowedClass(UStaticMesh::StaticClass())
+				.AllowedClass(UDataTable::StaticClass())
 				.DisplayBrowse(true)
 				.DisplayThumbnail(true)
 				.DisplayUseSelected(true)
@@ -196,10 +207,10 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 				.OnObjectChanged_Lambda([this](const FAssetData& Data) {
 					if (Data.IsValid())
 					{
-						FloorObjectPath = Data.ObjectPath.ToString();
+						DataTablePath = Data.ObjectPath.ToString();
 					}
 				})
-				.ObjectPath_Lambda([this]() { return FloorObjectPath; })
+				.ObjectPath_Lambda([this]() { return DataTablePath; })
 			]
 		];
 }
@@ -246,20 +257,42 @@ AActor* FEditorWindowModule::AddActor(TSubclassOf<AActor> ActorClass, FTransform
 	return GEditor->AddActor(Level, ActorClass, Transform);
 }
 
+FReply FEditorWindowModule::BuildButtonClicked()
+{
+	TArray<ULevel*> Levels = GEditor->GetEditorWorldContext().World()->GetLevels();
 
-FReply FEditorWindowModule::ButtonClicked()
+	bool bLevelInstantiated = false;
+	FTransform Transform;
+	Transform.SetLocation(FVector((Levels.Num()-1)*1000.0f, 0.0f, 0.0f));
+	Transform.SetRotation(FQuat::Identity);
+
+	FString LevelName = FMath::RandRange(0, 1) == 1 ? "Cylinder" : "Cone";
+
+	const FString name = (LevelName + "Level" + FString::FromInt(Levels.Num()));
+	ULevelStreamingDynamic::FLoadLevelInstanceParams Params(GEditor->GetEditorWorldContext().World(), ("/Game/ActionRoguelike/Plugin/Levels/"+LevelName), Transform);
+	Params.OptionalLevelNameOverride = &name;
+	ULevelStreamingDynamic::LoadLevelInstance(Params, bLevelInstantiated);
+
+	for (ULevel* Level : Levels) {
+		TArray<FString> Out;
+		TArray<FString> Out2;
+		Level->GetPathName().ParseIntoArray(Out, TEXT("/"), true);
+		Out[4].ParseIntoArray(Out2, TEXT("."), true);
+
+		FString LevelName = Out2[0];
+	}
+
+
+
+	return FReply::Handled();
+}
+
+FReply FEditorWindowModule::ReplaceButtonClicked()
 {
 	FText DialogText = FText::FromString("Button Clicked");
 	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
 
-	FTransform Transform;
 
-	AProceduralRoom* Room = Cast<AProceduralRoom>(AddActor(AProceduralRoom::StaticClass(), Transform));
-
-	//TODO: error handing if mesh not found
-	Room->FloorMesh = Cast<UStaticMesh>(StaticLoadObject(UStaticMesh::StaticClass(), nullptr, *FloorObjectPath));
-
-	Room->InitializeGraph();
 
 	return FReply::Handled();
 }
