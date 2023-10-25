@@ -20,6 +20,9 @@
 #include "Engine/LevelStreamingDynamic.h"
 #include "Math/Rotator.h"
 #include "Engine/World.h"
+#include "Engine/UserDefinedStruct.h"
+#include "EditorLevelUtils.h"
+#include "Engine/LevelStreamingAlwaysLoaded.h"
 
 static const FName EditorWindowTabName("EditorWindow");
 
@@ -208,11 +211,13 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 					if (Data.IsValid())
 					{
 						DataTablePath = Data.ObjectPath.ToString();
+						DataTable = Cast<UDataTable>(Data.GetAsset());
 					}
 				})
 				.ObjectPath_Lambda([this]() { return DataTablePath; })
 			]
 		];
+		Counter = 0;
 }
 
 void FEditorWindowModule::PluginButtonClicked()
@@ -259,40 +264,87 @@ AActor* FEditorWindowModule::AddActor(TSubclassOf<AActor> ActorClass, FTransform
 
 FReply FEditorWindowModule::BuildButtonClicked()
 {
-	TArray<ULevel*> Levels = GEditor->GetEditorWorldContext().World()->GetLevels();
+	int LevelsNum = GEditor->GetEditorWorldContext().World()->GetLevels().Num();
 
 	bool bLevelInstantiated = false;
 	FTransform Transform;
-	Transform.SetLocation(FVector((Levels.Num()-1)*1000.0f, 0.0f, 0.0f));
+	Transform.SetLocation(FVector((Counter)*1000.0f, 0.0f, 0.0f));
 	Transform.SetRotation(FQuat::Identity);
 
 	FString LevelName = FMath::RandRange(0, 1) == 1 ? "Cylinder" : "Cone";
 
-	const FString name = (LevelName + "Level" + FString::FromInt(Levels.Num()));
-	ULevelStreamingDynamic::FLoadLevelInstanceParams Params(GEditor->GetEditorWorldContext().World(), ("/Game/ActionRoguelike/Plugin/Levels/"+LevelName), Transform);
-	Params.OptionalLevelNameOverride = &name;
-	ULevelStreamingDynamic::LoadLevelInstance(Params, bLevelInstantiated);
+	//const FString name = (LevelName + "_" + FString::FromInt(LevelsNum));
+	//ULevelStreamingDynamic::FLoadLevelInstanceParams Params(GEditor->GetEditorWorldContext().World(), ("/Game/ActionRoguelike/Plugin/Levels/"+LevelName), Transform);
+	//Params.OptionalLevelNameOverride = &name;
+	//ULevelStreamingDynamic::LoadLevelInstance(Params, bLevelInstantiated);
 
-	for (ULevel* Level : Levels) {
-		TArray<FString> Out;
-		TArray<FString> Out2;
-		Level->GetPathName().ParseIntoArray(Out, TEXT("/"), true);
-		Out[4].ParseIntoArray(Out2, TEXT("."), true);
-
-		FString LevelName = Out2[0];
-	}
-
-
+	ULevelStreaming* LevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
+																	*("/Game/ActionRoguelike/Plugin/Levels/" + LevelName),
+																	ULevelStreamingAlwaysLoaded::StaticClass(),
+																	Transform);
+	LevelStream->RenameForPIE(Counter);
+	Counter++;
 
 	return FReply::Handled();
 }
 
+struct DataTableData
+{
+	TSet<FString> ReplaceWith;
+};
+
 FReply FEditorWindowModule::ReplaceButtonClicked()
 {
-	FText DialogText = FText::FromString("Button Clicked");
-	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+	if (DataTable == nullptr)
+	{
+		FText DialogText = FText::FromString("DataTable can't be empty!");
+		FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+
+		return FReply::Handled();
+	}
+
+	const TArray<ULevelStreaming*> StreamedLevels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
+	const TMap<FName, uint8*> RowMap = DataTable->GetRowMap();
+
+	for (ULevelStreaming* StreamedLevel : StreamedLevels)
+	{
+		TArray<FString> Out;
+		TArray<FString> Out2;
+		StreamedLevel->GetLoadedLevel()->GetPathName().ParseIntoArray(Out, TEXT("/"), true);
+		Out[4].ParseIntoArray(Out2, TEXT("."), true);
+
+		FString CurrentLevelName = Out2[0];
+
+		CurrentLevelName.ParseIntoArray(Out, TEXT("_"), true);
+
+		//get the level's original name
+		FString OriginalLevelName = Out[2];
+
+		//iterate through the datatable
+		for (auto& Row : RowMap)
+		{
+			if (Row.Key.ToString() != OriginalLevelName) continue;
+
+			TSet<FString> ReplaceWith = ((DataTableData*)Row.Value)->ReplaceWith;
+
+			int RandomIndex = FMath::RandRange(0, ReplaceWith.Num() - 1);
+			FString LevelNameRand = ReplaceWith.Array()[RandomIndex];
+
+			//TODO fix transform breaking up with 1 tile forward
+			FTransform StreamedLevelTransform = StreamedLevel->LevelTransform;
 
 
+			ULevelStreaming* NewLevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
+																				*("/Game/ActionRoguelike/Plugin/Levels/" + LevelNameRand),
+																				ULevelStreamingAlwaysLoaded::StaticClass(),
+																				StreamedLevelTransform);
+			NewLevelStream->RenameForPIE(Counter);
+
+			EditorLevelUtils::RemoveLevelFromWorld(StreamedLevel->GetLoadedLevel());
+
+			break;
+		}
+	}
 
 	return FReply::Handled();
 }

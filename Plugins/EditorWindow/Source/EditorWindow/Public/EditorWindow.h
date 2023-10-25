@@ -8,6 +8,7 @@
 class FToolBarBuilder;
 class FMenuBuilder;
 class FReply;
+class UUserDefinedStruct;
 
 class FEditorWindowModule : public IModuleInterface
 {
@@ -33,7 +34,7 @@ private:
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
 
-	UPROPERTY()
+	UPROPERTY(EditDefaultsOnly)
 	UDataTable* DataTable;
 
 private:
@@ -41,4 +42,6 @@ private:
 
 	UPROPERTY()
 	FString DataTablePath;
+
+	unsigned short Counter;
 };
