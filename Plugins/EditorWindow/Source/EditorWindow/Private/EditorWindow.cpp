@@ -12,8 +12,7 @@
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SButton.h"
-#include "Components/SplineComponent.h"
-#include "ProceduralRoom.h"
+#include "Widgets/Input/SDirectoryPicker.h"
 #include "ToolMenus.h"
 #include "Containers/StringFwd.h"
 #include "PropertyCustomizationHelpers.h"
@@ -23,6 +22,9 @@
 #include "Engine/UserDefinedStruct.h"
 #include "EditorLevelUtils.h"
 #include "Engine/LevelStreamingAlwaysLoaded.h"
+#include "Engine/LevelStreaming.h"
+#include "HAL/FileManagerGeneric.h"
+#include "EditorAssetLibrary.h"
 
 static const FName EditorWindowTabName("EditorWindow");
 
@@ -68,7 +70,7 @@ void FEditorWindowModule::ShutdownModule()
 }
 
 TSharedPtr<STextBlock> ComboBoxTitleBlock;
-TArray< TSharedPtr< FString > > ComboItems;
+TArray<TSharedPtr<FString>> ComboItems;
 
 TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
@@ -88,16 +90,6 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 	return SNew(SDockTab)
 		.TabRole(ETabRole::NomadTab)
 		[
-			/*
-			// Put your tab content here!
-			SNew(SBox)
-			.HAlign(HAlign_Center)
-			.VAlign(VAlign_Center)
-			[
-				SNew(STextBlock)
-				.Text(WidgetText)
-			]
-			*/
 			SNew(SScrollBox)
 			+SScrollBox::Slot()
 			.Padding(10,5)
@@ -182,13 +174,76 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 				]
 			]
 			+ SScrollBox::Slot()
-				.Padding(10, 5)
+			.Padding(10, 5)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.FillWidth(1)
 				[
-					SNew(SButton)
-					.Text(FText::FromString("Build"))
+					SNew(STextBlock)
+					.Text(FText::FromString(TEXT("DataTable:")))
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(3)
+				[
+					SNew(SObjectPropertyEntryBox)
+					.AllowedClass(UDataTable::StaticClass())
+					.DisplayBrowse(true)
+					.DisplayThumbnail(true)
+					.DisplayUseSelected(true)
+					.EnableContentPicker(true)
+					.AllowClear(false)
+					.OnObjectChanged_Lambda([this](const FAssetData& Data) {
+						if (Data.IsValid())
+						{
+							DataTablePath = Data.GetObjectPathString();
+							DataTable = Cast<UDataTable>(Data.GetAsset());
+
+							//check if selected datatable is created from WorldStruct
+							if (DataTable->GetRowStructName() != "WorldStruct")
+							{
+								FText DialogText = FText::FromString("Table must be created from WorldStruct!");
+								FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+
+								DataTable = nullptr;
+								DataTablePath = "";
+							}
+						}
+					})
+					.ObjectPath_Lambda([this]() { return DataTablePath; })
+				]
+			]
+
+			+ SScrollBox::Slot()
+			.Padding(10, 5)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.FillWidth(1)
+				[
+					SNew(STextBlock)
+					.Text(FText::FromString(TEXT("Levels Path:")))
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(3)
+				[
+					SNew(SDirectoryPicker)
+					.OnDirectoryChanged_Lambda([this](const FString& Directory) {
+						//convert absolute path to relative (/Game/ActionRoguelike/Plugin/Levels/) TODO: error check
+						TArray<FString> Out;
+						IFileManager::Get().ConvertToRelativePath(*Directory).ParseIntoArray(Out, TEXT("Content"));
+						FolderPath = "/Game" + Out[1] + "/";
+					})
+				]
+			]
+			+ SScrollBox::Slot()
+			.Padding(10, 5)
+			[
+				SNew(SButton)
+				.Text(FText::FromString("Build"))
 				.HAlign(HAlign_Center)
 				.OnClicked_Raw(this, &FEditorWindowModule::BuildButtonClicked)
-				]
+			]
 			+SScrollBox::Slot()
 			.Padding(10, 5)
 			[
@@ -196,25 +251,6 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 				.Text(FText::FromString("Replace"))
 				.HAlign(HAlign_Center)
 				.OnClicked_Raw(this, &FEditorWindowModule::ReplaceButtonClicked)
-			]
-			+SScrollBox::Slot()
-			.Padding(10,5)
-			[
-				SNew(SObjectPropertyEntryBox)
-				.AllowedClass(UDataTable::StaticClass())
-				.DisplayBrowse(true)
-				.DisplayThumbnail(true)
-				.DisplayUseSelected(true)
-				.EnableContentPicker(true)
-				.AllowClear(false)
-				.OnObjectChanged_Lambda([this](const FAssetData& Data) {
-					if (Data.IsValid())
-					{
-						DataTablePath = Data.ObjectPath.ToString();
-						DataTable = Cast<UDataTable>(Data.GetAsset());
-					}
-				})
-				.ObjectPath_Lambda([this]() { return DataTablePath; })
 			]
 		];
 		Counter = 0;
@@ -262,22 +298,47 @@ AActor* FEditorWindowModule::AddActor(TSubclassOf<AActor> ActorClass, FTransform
 	return GEditor->AddActor(Level, ActorClass, Transform);
 }
 
+bool FEditorWindowModule::ErrorCheck()
+{
+	if (DataTable == nullptr)
+	{
+		FText DialogText = FText::FromString("DataTable can't be empty!");
+		FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+
+		return false;
+	}
+
+	if (FolderPath == "")
+	{
+		FText DialogText = FText::FromString("Level path can't be empty!");
+		FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+
+		return false;
+	}
+
+	return true;
+}
+
 FReply FEditorWindowModule::BuildButtonClicked()
 {
-	//get only loaded and renamed levels
-	TArray<ULevel*> Levels = GEditor->GetEditorWorldContext().World()->GetLevels();
-	Levels = Levels.FilterByPredicate([&](ULevel* Level) { return Level->GetPathName().Contains("UEDPIE"); });
-	int LevelsNum = Levels.Num();
+	if(!ErrorCheck()) return FReply::Handled();
 
-	bool bLevelInstantiated = false;
+	//get only loaded and renamed levels
+	/*
+	TArray<ULevel*> Levels2 = GEditor->GetEditorWorldContext().World()->GetLevels().FilterByPredicate([](ULevel* Level) { 
+		return Level->GetPathName().Contains("UEDPIE"); 
+	})*/
+
+	TArray<ULevelStreaming*> Levels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
+
 	FTransform Transform;
-	Transform.SetLocation(FVector(LevelsNum*1000.0f, 0.0f, 0.0f));
+	Transform.SetLocation(FVector(Levels.Num()*1000.0f, 0.0f, 0.0f));
 	Transform.SetRotation(FQuat::Identity);
 
 	FString LevelName = FMath::RandRange(0, 1) == 1 ? "Cylinder" : "Cone";
 
 	ULevelStreaming* LevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
-																	*("/Game/ActionRoguelike/Plugin/Levels/" + LevelName),
+																	*(FolderPath + LevelName),
 																	ULevelStreamingAlwaysLoaded::StaticClass(),
 																	Transform);
 	LevelStream->RenameForPIE(Counter++);
@@ -292,20 +353,13 @@ struct DataTableData
 
 FReply FEditorWindowModule::ReplaceButtonClicked()
 {
-	if (DataTable == nullptr)
-	{
-		FText DialogText = FText::FromString("DataTable can't be empty!");
-		FMessageDialog::Open(EAppMsgType::Ok, DialogText);
-
-		return FReply::Handled();
-	}
+	if (!ErrorCheck()) return FReply::Handled();
 
 	const TArray<ULevelStreaming*> StreamedLevels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
 	const TMap<FName, uint8*> RowMap = DataTable->GetRowMap();
 
 	for (ULevelStreaming* StreamedLevel : StreamedLevels)
 	{
-		//get the level's original name
 		TArray<FString> Out;
 		TArray<FString> Out2;
 		StreamedLevel->GetLoadedLevel()->GetPathName().ParseIntoArray(Out, TEXT("/"), true);
@@ -327,14 +381,23 @@ FReply FEditorWindowModule::ReplaceButtonClicked()
 			unsigned short RandomIndex = FMath::RandRange(0, ReplaceWith.Num() - 1);
 			FString LevelNameRand = ReplaceWith.Array()[RandomIndex];
 
+			//check if level exists
+			if (!UEditorAssetLibrary::DoesAssetExist(FolderPath + LevelNameRand))
+			{
+				FText DialogText = FText::FromString("Level '" + LevelNameRand + "' doesn't exist!");
+				FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+
+				return FReply::Handled();
+			}
+
 			FTransform StreamedLevelTransform = StreamedLevel->LevelTransform;
 
 			ULevelStreaming* NewLevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
-																				*("/Game/ActionRoguelike/Plugin/Levels/" + LevelNameRand),
+																				*(FolderPath + LevelNameRand),
 																				ULevelStreamingAlwaysLoaded::StaticClass(),
 																				StreamedLevelTransform);
 			NewLevelStream->RenameForPIE(Counter++);
-
+			
 			EditorLevelUtils::RemoveLevelFromWorld(StreamedLevel->GetLoadedLevel());
 
 			break;

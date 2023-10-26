@@ -4,11 +4,26 @@
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
+#include "EditorWindow.generated.h"
+
+// Struct to use in creating the datatable
+USTRUCT(BlueprintType)
+struct FWorldStruct : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UWorld> World;
+
+	UPROPERTY(EditAnywhere)
+	TSet<TSoftObjectPtr<UWorld>> ReplaceWorlds;
+};
 
 class FToolBarBuilder;
 class FMenuBuilder;
 class FReply;
 class UUserDefinedStruct;
+
 
 class FEditorWindowModule : public IModuleInterface
 {
@@ -34,14 +49,20 @@ private:
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
 
-	UPROPERTY(EditDefaultsOnly)
-	UDataTable* DataTable;
+
 
 private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 
 	UPROPERTY()
 	FString DataTablePath;
+
+	UPROPERTY(EditDefaultsOnly)
+	UDataTable* DataTable;
+
+	FString FolderPath;
+
+	bool ErrorCheck();
 
 	unsigned short Counter;
 };

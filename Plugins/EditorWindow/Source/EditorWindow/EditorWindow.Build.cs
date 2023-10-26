@@ -44,7 +44,9 @@ public class EditorWindow : ModuleRules
 				"Slate",
 				"SlateCore",
 				"PCG",
-                "PropertyEditor"
+				"DesktopWidgets",
+                "PropertyEditor",
+                "EditorScriptingUtilities"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
