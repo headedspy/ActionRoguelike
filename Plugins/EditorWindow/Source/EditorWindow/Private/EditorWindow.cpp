@@ -25,6 +25,8 @@
 #include "Engine/LevelStreaming.h"
 #include "HAL/FileManagerGeneric.h"
 #include "EditorAssetLibrary.h"
+#include <UObject/ConstructorHelpers.h>
+#include <Kismet/GameplayStatics.h>
 
 static const FName EditorWindowTabName("EditorWindow");
 
@@ -74,105 +76,10 @@ TArray<TSharedPtr<FString>> ComboItems;
 
 TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	FText WidgetText = FText::FromString(TEXT("One"));
-
-	ComboItems.Add(MakeShareable(new FString(TEXT("One"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Two"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Three"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Four"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Five"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Six"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Seven"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Eight"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Nine"))));
-	ComboItems.Add(MakeShareable(new FString(TEXT("Ten"))));
-
 	return SNew(SDockTab)
 		.TabRole(ETabRole::NomadTab)
 		[
 			SNew(SScrollBox)
-			+SScrollBox::Slot()
-			.Padding(10,5)
-			[
-				SNew(SHorizontalBox)
-				+SHorizontalBox::Slot()
-				.HAlign(HAlign_Left)
-				[
-					SNew(STextBlock)
-					.Text(WidgetText)
-				]
-
-				+SHorizontalBox::Slot()
-				.HAlign(HAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(WidgetText)
-				]
-
-				+ SHorizontalBox::Slot()
-				.HAlign(HAlign_Right)
-				[
-					SNew(STextBlock)
-					.Text(WidgetText)
-				]
-			]
-			+SScrollBox::Slot()
-			.Padding(10,5)
-			[
-				SNew(SHorizontalBox)
-				+SHorizontalBox::Slot()
-				.FillWidth(2)
-				[
-					SNew(STextBlock)
-					.Text(WidgetText)
-				]
-				
-				+SHorizontalBox::Slot()
-				.FillWidth(1)
-				[
-					SNew(STextBlock)
-					.Text(WidgetText)
-				]
-
-				+SHorizontalBox::Slot()
-				.FillWidth(3)
-				[
-					SNew(STextBlock)
-					.Text(WidgetText)
-				]
-			]
-			+ SScrollBox::Slot()
-			.Padding(10, 5)
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.FillWidth(2)
-				[
-					SNew(SCheckBox)
-					.OnCheckStateChanged_Raw(this, &FEditorWindowModule::ChangedState)
-				]
-
-				+ SHorizontalBox::Slot()
-				.FillWidth(1)
-				[
-					SNew(SComboBox<TSharedPtr<FString> >)
-					.OptionsSource(&ComboItems)
-					.OnGenerateWidget_Lambda([](TSharedPtr<FString> Item)
-					{
-						return SNew(STextBlock).Text(FText::FromString(*Item));
-					})
-					.OnSelectionChanged_Lambda([this](TSharedPtr<FString> InSelection, ESelectInfo::Type InSelectInfo)
-					{
-						if (InSelection.IsValid() && ComboBoxTitleBlock.IsValid())
-						{
-							ComboBoxTitleBlock->SetText(FText::FromString(*InSelection));
-						}
-					})
-					[
-						SAssignNew(ComboBoxTitleBlock, STextBlock).Text(LOCTEXT("ComboLabel", "Label"))
-					]
-				]
-			]
 			+ SScrollBox::Slot()
 			.Padding(10, 5)
 			[
@@ -211,29 +118,6 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 						}
 					})
 					.ObjectPath_Lambda([this]() { return DataTablePath; })
-				]
-			]
-
-			+ SScrollBox::Slot()
-			.Padding(10, 5)
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.FillWidth(1)
-				[
-					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("Levels Path:")))
-				]
-				+ SHorizontalBox::Slot()
-				.FillWidth(3)
-				[
-					SNew(SDirectoryPicker)
-					.OnDirectoryChanged_Lambda([this](const FString& Directory) {
-						//convert absolute path to relative (/Game/ActionRoguelike/Plugin/Levels/) TODO: error check
-						TArray<FString> Out;
-						IFileManager::Get().ConvertToRelativePath(*Directory).ParseIntoArray(Out, TEXT("Content"));
-						FolderPath = "/Game" + Out[1] + "/";
-					})
 				]
 			]
 			+ SScrollBox::Slot()
@@ -286,12 +170,6 @@ void FEditorWindowModule::RegisterMenus()
 	}
 }
 
-void FEditorWindowModule::ChangedState(ECheckBoxState newState)
-{
-	FText DialogText = FText::FromString("Changed state");
-	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
-}
-
 AActor* FEditorWindowModule::AddActor(TSubclassOf<AActor> ActorClass, FTransform Transform)
 {
 	ULevel* Level = GEditor->GetEditorWorldContext().World()->GetCurrentLevel();
@@ -308,15 +186,22 @@ bool FEditorWindowModule::ErrorCheck()
 		return false;
 	}
 
-	if (FolderPath == "")
-	{
-		FText DialogText = FText::FromString("Level path can't be empty!");
-		FMessageDialog::Open(EAppMsgType::Ok, DialogText);
-
-		return false;
-	}
-
 	return true;
+}
+
+
+void FEditorWindowModule::GetAllLevels(UWorld* world, TSet<ULevel*>& OutLevels) {
+
+	world->FlushLevelStreaming();
+
+	TArray<AActor*> AllActors;
+	UGameplayStatics::GetAllActorsOfClass(world, AActor::StaticClass(), AllActors);
+
+
+	for (AActor* actor : AllActors)
+	{
+		OutLevels.Add(actor->GetLevel());
+	}
 }
 
 FReply FEditorWindowModule::BuildButtonClicked()
@@ -335,12 +220,54 @@ FReply FEditorWindowModule::BuildButtonClicked()
 	Transform.SetLocation(FVector(Levels.Num()*1000.0f, 0.0f, 0.0f));
 	Transform.SetRotation(FQuat::Identity);
 
-	FString LevelName = FMath::RandRange(0, 1) == 1 ? "Cylinder" : "Cone";
+
+	const TMap<FName, uint8*> DataTableRows = DataTable->GetRowMap();
+	TSet<FName> KeysSet;
+	int32 NrOfKeys = DataTableRows.GetKeys(KeysSet);
+
+	FName RowName = KeysSet.Array()[FMath::RandRange(0, NrOfKeys-1)];
+
+
+	FWorldStruct* ChosenLevel = DataTable->FindRow<FWorldStruct>(RowName, "");
+
+	//FString level = ChosenLevel->World.ToSoftObjectPath().ToString(); /GAME PATH
+	//FString level = ChosenLevel->World.GetAssetName(); ASSET NAME
+
+	/*
+	UWorld* levelworld = ChosenLevel->World.LoadSynchronous();
+	levelworld->FlushLevelStreaming();
+
+	TArray<AActor*> AllActors;
+	UGameplayStatics::GetAllActorsOfClass(levelworld, AActor::StaticClass(), AllActors);
+
+	TSet<ULevel*> AllLevels;
+	
+	for (AActor* actor : AllActors)
+	{
+		AllLevels.Add(actor->GetLevel());
+	}
+	*/
+
+
+	UWorld* levelworld = ChosenLevel->World.LoadSynchronous();
+	TSet<ULevel*> AllLevels;
+	GetAllLevels(levelworld, AllLevels);
+
+	for (ULevel* Level : AllLevels) {
+		FText DialogText = FText::FromString(Level->GetPathName());
+		FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+	}
+
+
+
 
 	ULevelStreaming* LevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
-																	*(FolderPath + LevelName),
+																	*ChosenLevel->World.ToSoftObjectPath().ToString(),
 																	ULevelStreamingAlwaysLoaded::StaticClass(),
 																	Transform);
+	
+	
+
 	LevelStream->RenameForPIE(Counter++);
 
 	return FReply::Handled();
@@ -371,6 +298,7 @@ FReply FEditorWindowModule::ReplaceButtonClicked()
 
 		FString OriginalLevelName = Out[2];
 
+		/*
 		//iterate through the datatable
 		for (auto& Row : RowMap)
 		{
@@ -380,15 +308,6 @@ FReply FEditorWindowModule::ReplaceButtonClicked()
 
 			unsigned short RandomIndex = FMath::RandRange(0, ReplaceWith.Num() - 1);
 			FString LevelNameRand = ReplaceWith.Array()[RandomIndex];
-
-			//check if level exists
-			if (!UEditorAssetLibrary::DoesAssetExist(FolderPath + LevelNameRand))
-			{
-				FText DialogText = FText::FromString("Level '" + LevelNameRand + "' doesn't exist!");
-				FMessageDialog::Open(EAppMsgType::Ok, DialogText);
-
-				return FReply::Handled();
-			}
 
 			FTransform StreamedLevelTransform = StreamedLevel->LevelTransform;
 
@@ -402,6 +321,7 @@ FReply FEditorWindowModule::ReplaceButtonClicked()
 
 			break;
 		}
+		*/
 	}
 
 	return FReply::Handled();

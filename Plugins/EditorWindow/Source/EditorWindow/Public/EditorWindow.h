@@ -40,8 +40,6 @@ private:
 
 	void RegisterMenus();
 
-	void ChangedState(ECheckBoxState newState);
-
 	FReply BuildButtonClicked();
 	FReply ReplaceButtonClicked();
 
@@ -60,9 +58,10 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	UDataTable* DataTable;
 
-	FString FolderPath;
+	unsigned short Counter;
 
 	bool ErrorCheck();
 
-	unsigned short Counter;
+	void GetAllLevels(UWorld* world, TSet<ULevel*>& OutLevels);
+
 };
