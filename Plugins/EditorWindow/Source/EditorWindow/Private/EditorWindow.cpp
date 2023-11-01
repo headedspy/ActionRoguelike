@@ -190,8 +190,7 @@ bool FEditorWindowModule::ErrorCheck()
 	return true;
 }
 
-
-void FEditorWindowModule::GetAllLevels(UWorld* world, TSet<ULevel*>& OutLevels) {
+void FEditorWindowModule::GetAllLevels(UWorld* world, TSet<ULevelStreaming*>& OutLevels) {
 	if (world == nullptr) return;
 	
 	FWorldContext& NewWorldContext = GEngine->CreateNewWorldContext(EWorldType::None);
@@ -199,16 +198,18 @@ void FEditorWindowModule::GetAllLevels(UWorld* world, TSet<ULevel*>& OutLevels) 
 
 	world->RefreshStreamingLevels();
 
-	TSet<ULevel*> TempLevels;
-	const TArray<ULevel*> Levels = world->GetLevels();
+	TSet<ULevelStreaming*> TempLevels;
+	const TArray<ULevelStreaming*> Levels = world->GetStreamingLevels();
 	const short LevelsSize = Levels.Num();
 
-	for (int i = 1; i < LevelsSize; i++)
+	for (int i = 0; i < LevelsSize; i++)
 	{
+		OutLevels.Add(Levels[i]);
 		GetAllSubLevels(Levels[i], TempLevels);
 	}
 
-	for (ULevel* Level : TempLevels)
+
+	for (ULevelStreaming* Level : TempLevels)
 	{
 		OutLevels.Add(Level);
 	}
@@ -216,35 +217,22 @@ void FEditorWindowModule::GetAllLevels(UWorld* world, TSet<ULevel*>& OutLevels) 
 	GEngine->DestroyWorldContext(world);
 }
 
-
-void FEditorWindowModule::GetAllSubLevels(ULevel* level, TSet<ULevel*>& OutLevels) {
+void FEditorWindowModule::GetAllSubLevels(ULevelStreaming* level, TSet<ULevelStreaming*>& OutLevels) {
 	TSet<ULevel*> TempLevels;
 
-	UWorld* world = Cast<UWorld>(level->GetOuter());
+	UWorld* world = Cast<UWorld>(level->GetLoadedLevel()->GetOuter());
 	FWorldContext& NewWorldContext = GEngine->CreateNewWorldContext(EWorldType::None);
 	NewWorldContext.SetCurrentWorld(world);
 
 	world->RefreshStreamingLevels();
 
-	const TArray<ULevel*> Levels = world->GetLevels();
+	const TArray<ULevelStreaming*> Levels = world->GetStreamingLevels();
 	const short LevelsSize = Levels.Num();
 
-	for (ULevel* Level : TempLevels)
+	for (int i = 0; i < LevelsSize; i++)
 	{
-		Level->bClientOnlyVisible = true;
-	}
-
-	for (int i = 1; i < LevelsSize; i++)
-	{
-		TempLevels.Add(Levels[i]);
-		GetAllSubLevels(Levels[i], TempLevels);
-	}
-
-	TempLevels.Add(Levels[0]);
-
-	for (ULevel* Level : TempLevels)
-	{
-		OutLevels.Add(Level);
+		OutLevels.Add(Levels[i]);
+		GetAllSubLevels(Levels[i], OutLevels);
 	}
 
 	GEngine->DestroyWorldContext(world);
@@ -270,30 +258,32 @@ FReply FEditorWindowModule::BuildButtonClicked()
 
 	FWorldStruct* ChosenLevel = DataTable->FindRow<FWorldStruct>(RowName, "");
 
-	//FString level = ChosenLevel->World.ToSoftObjectPath().ToString(); /GAME PATH
-	//FString level = ChosenLevel->World.GetAssetName(); ASSET NAME
-
 	UWorld* levelworld = ChosenLevel->World.LoadSynchronous();
-	TSet<ULevel*> AllLevels;
+	TSet<ULevelStreaming*> AllLevels;
 	GetAllLevels(levelworld, AllLevels);
 
-	for (ULevel* Level : AllLevels) {
-		FText DialogText = FText::FromString(Level->GetPathName());
-		FMessageDialog::Open(EAppMsgType::Ok, DialogText);
-	}
+	FText DialogText = FText::FromString(ChosenLevel->World.ToSoftObjectPath().ToString());
+	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
 
-
-
-	//causes crash on level switch
 	ULevelStreaming* LevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
-																	*ChosenLevel->World.ToSoftObjectPath().ToString(),
+																	*(ChosenLevel->World.ToSoftObjectPath().ToString()),
 																	ULevelStreamingAlwaysLoaded::StaticClass(),
 																	Transform);
-	
-	
 
 	LevelStream->RenameForPIE(Counter++);
+	for (ULevelStreaming* Level : AllLevels) {
+		//DialogText = FText::FromString(Level->GetLoadedLevel()->GetOuter()->GetPathName());
+		//FMessageDialog::Open(EAppMsgType::Ok, DialogText);
 
+		LevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
+																		*Level->GetLoadedLevel()->GetOuter()->GetPathName(),
+																		ULevelStreamingAlwaysLoaded::StaticClass(),
+																		Transform + Level->LevelTransform);
+	
+	
+
+		LevelStream->RenameForPIE(Counter++);
+	}
 	return FReply::Handled();
 }
 
