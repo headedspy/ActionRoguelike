@@ -63,5 +63,6 @@ private:
 	bool ErrorCheck();
 
 	void GetAllLevels(UWorld* world, TSet<ULevel*>& OutLevels);
+	void GetAllSubLevels(ULevel* level, TSet<ULevel*>& OutLevels);
 
 };

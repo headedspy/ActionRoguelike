@@ -27,6 +27,7 @@
 #include "EditorAssetLibrary.h"
 #include <UObject/ConstructorHelpers.h>
 #include <Kismet/GameplayStatics.h>
+#include "Engine/Engine.h"
 
 static const FName EditorWindowTabName("EditorWindow");
 
@@ -191,28 +192,67 @@ bool FEditorWindowModule::ErrorCheck()
 
 
 void FEditorWindowModule::GetAllLevels(UWorld* world, TSet<ULevel*>& OutLevels) {
+	if (world == nullptr) return;
+	
+	FWorldContext& NewWorldContext = GEngine->CreateNewWorldContext(EWorldType::None);
+	NewWorldContext.SetCurrentWorld(world);
 
-	world->FlushLevelStreaming();
+	world->RefreshStreamingLevels();
 
-	TArray<AActor*> AllActors;
-	UGameplayStatics::GetAllActorsOfClass(world, AActor::StaticClass(), AllActors);
+	TSet<ULevel*> TempLevels;
+	const TArray<ULevel*> Levels = world->GetLevels();
+	const short LevelsSize = Levels.Num();
 
-
-	for (AActor* actor : AllActors)
+	for (int i = 1; i < LevelsSize; i++)
 	{
-		OutLevels.Add(actor->GetLevel());
+		GetAllSubLevels(Levels[i], TempLevels);
 	}
+
+	for (ULevel* Level : TempLevels)
+	{
+		OutLevels.Add(Level);
+	}
+
+	GEngine->DestroyWorldContext(world);
+}
+
+
+void FEditorWindowModule::GetAllSubLevels(ULevel* level, TSet<ULevel*>& OutLevels) {
+	TSet<ULevel*> TempLevels;
+
+	UWorld* world = Cast<UWorld>(level->GetOuter());
+	FWorldContext& NewWorldContext = GEngine->CreateNewWorldContext(EWorldType::None);
+	NewWorldContext.SetCurrentWorld(world);
+
+	world->RefreshStreamingLevels();
+
+	const TArray<ULevel*> Levels = world->GetLevels();
+	const short LevelsSize = Levels.Num();
+
+	for (ULevel* Level : TempLevels)
+	{
+		Level->bClientOnlyVisible = true;
+	}
+
+	for (int i = 1; i < LevelsSize; i++)
+	{
+		TempLevels.Add(Levels[i]);
+		GetAllSubLevels(Levels[i], TempLevels);
+	}
+
+	TempLevels.Add(Levels[0]);
+
+	for (ULevel* Level : TempLevels)
+	{
+		OutLevels.Add(Level);
+	}
+
+	GEngine->DestroyWorldContext(world);
 }
 
 FReply FEditorWindowModule::BuildButtonClicked()
 {
 	if(!ErrorCheck()) return FReply::Handled();
-
-	//get only loaded and renamed levels
-	/*
-	TArray<ULevel*> Levels2 = GEditor->GetEditorWorldContext().World()->GetLevels().FilterByPredicate([](ULevel* Level) { 
-		return Level->GetPathName().Contains("UEDPIE"); 
-	})*/
 
 	TArray<ULevelStreaming*> Levels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
 
@@ -233,22 +273,6 @@ FReply FEditorWindowModule::BuildButtonClicked()
 	//FString level = ChosenLevel->World.ToSoftObjectPath().ToString(); /GAME PATH
 	//FString level = ChosenLevel->World.GetAssetName(); ASSET NAME
 
-	/*
-	UWorld* levelworld = ChosenLevel->World.LoadSynchronous();
-	levelworld->FlushLevelStreaming();
-
-	TArray<AActor*> AllActors;
-	UGameplayStatics::GetAllActorsOfClass(levelworld, AActor::StaticClass(), AllActors);
-
-	TSet<ULevel*> AllLevels;
-	
-	for (AActor* actor : AllActors)
-	{
-		AllLevels.Add(actor->GetLevel());
-	}
-	*/
-
-
 	UWorld* levelworld = ChosenLevel->World.LoadSynchronous();
 	TSet<ULevel*> AllLevels;
 	GetAllLevels(levelworld, AllLevels);
@@ -260,7 +284,7 @@ FReply FEditorWindowModule::BuildButtonClicked()
 
 
 
-
+	//causes crash on level switch
 	ULevelStreaming* LevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
 																	*ChosenLevel->World.ToSoftObjectPath().ToString(),
 																	ULevelStreamingAlwaysLoaded::StaticClass(),
