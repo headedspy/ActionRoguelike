@@ -58,11 +58,23 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	UDataTable* DataTable;
 
-	unsigned short Counter;
+	unsigned short PIERenameCounter;
+
+	int32 BuildNum;
+	int32 SeedNum;
+
+	bool DeleteOnReplace;
 
 	bool ErrorCheck();
 
-	void GetAllLevels(UWorld* world, TSet<ULevelStreaming*>& OutLevels);
-	void GetAllSubLevels(ULevelStreaming* level, TSet<ULevelStreaming*>& OutLevels);
+	void CheckboxButtonStateChanged(ECheckBoxState IState);
 
+	void GetAllLevels(UWorld* world, TSet<ULevelStreaming*>& OutLevels);
+	void GetAllSubLevels(ULevelStreaming* level, TSet<ULevelStreaming*>& OutLevels, bool AlterTransform);
+	FString ClearPathFormatting(FString InputString, FString RemoveFrom);
+
+	bool LoadFullLevel(UWorld* World, FTransform Transform, bool AddToGameLevels=true);
+
+	TMap<ULevelStreaming*, TSet<ULevelStreaming*>> GameLevels;
+	TSet<UWorld*> LevelsWithAlteredTransform;
 };

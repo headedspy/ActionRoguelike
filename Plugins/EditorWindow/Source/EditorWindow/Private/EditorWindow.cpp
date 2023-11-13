@@ -28,6 +28,10 @@
 #include <UObject/ConstructorHelpers.h>
 #include <Kismet/GameplayStatics.h>
 #include "Engine/Engine.h"
+#include <EditorSupportDelegates.h>
+#include <LevelUtils.h>
+#include <Subsystems/EditorActorSubsystem.h>
+#include "WorldBrowser/Public/WorldBrowserModule.h"
 
 static const FName EditorWindowTabName("EditorWindow");
 
@@ -124,10 +128,39 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 			+ SScrollBox::Slot()
 			.Padding(10, 5)
 			[
-				SNew(SButton)
-				.Text(FText::FromString("Build"))
-				.HAlign(HAlign_Center)
-				.OnClicked_Raw(this, &FEditorWindowModule::BuildButtonClicked)
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.FillWidth(1)
+				[
+					SNew(SEditableTextBox)
+					.OnTextChanged_Lambda([this](const FText& NewText) {
+							int32 Num = FCString::Atoi(*(NewText.ToString()));
+							if (Num == 0)
+							{
+								FText DialogText = FText::FromString("Input a positive integer!");
+								FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+							}
+							else {
+								BuildNum = Num;
+							}
+					})
+					.Text_Lambda([this]() { 
+						if (BuildNum == 0) {
+							return FText();
+						}
+						else {
+							return FText(FText::FromString(FString::FromInt(BuildNum)));
+						}
+					})
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(5)
+				[
+					SNew(SButton)
+					.Text(FText::FromString("Build"))
+					.HAlign(HAlign_Center)
+					.OnClicked_Raw(this, &FEditorWindowModule::BuildButtonClicked)
+				]
 			]
 			+SScrollBox::Slot()
 			.Padding(10, 5)
@@ -137,8 +170,66 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 				.HAlign(HAlign_Center)
 				.OnClicked_Raw(this, &FEditorWindowModule::ReplaceButtonClicked)
 			]
+			+ SScrollBox::Slot()
+			.Padding(10, 5)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.FillWidth(2)
+				[
+					SNew(SEditableTextBox)
+					.OnTextChanged_Lambda([this](const FText& NewText) {
+						int32 Num = FCString::Atoi(*(NewText.ToString()));
+						if (Num == 0 && NewText.ToString() != "")
+						{
+							FText DialogText = FText::FromString("Input a positive integer!");
+							FMessageDialog::Open(EAppMsgType::Ok, DialogText);
+						}
+						else {
+							SeedNum = Num;
+						}
+					})
+					.Text_Lambda([this]() {
+						if (SeedNum == 0) {
+							return FText();
+						}
+						else {
+							return FText(FText::FromString(FString::FromInt(SeedNum)));
+						}
+					})
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(4)
+				[
+					SNew(STextBlock)
+					.Text(FText::FromString(TEXT("Seed Value (Leave empty for random)")))
+				]
+			]
+			+SScrollBox::Slot()
+			.Padding(10, 5)
+			[
+				SNew(SHorizontalBox)
+				+SHorizontalBox::Slot()
+				.FillWidth(1)
+				[
+					SNew(SCheckBox)
+					.OnCheckStateChanged_Raw(this, &FEditorWindowModule::CheckboxButtonStateChanged)
+				]
+				+SHorizontalBox::Slot()
+				.FillWidth(5)
+				[
+					SNew(STextBlock)
+					.Text(FText::FromString(TEXT("Delete on replace")))
+				] 
+			]
 		];
-		Counter = 0;
+		PIERenameCounter = 0;
+		DeleteOnReplace = false;
+}
+
+void FEditorWindowModule::CheckboxButtonStateChanged(ECheckBoxState State)
+{
+	DeleteOnReplace = State == ECheckBoxState::Checked ? true : false;
 }
 
 void FEditorWindowModule::PluginButtonClicked()
@@ -202,22 +293,29 @@ void FEditorWindowModule::GetAllLevels(UWorld* world, TSet<ULevelStreaming*>& Ou
 	const TArray<ULevelStreaming*> Levels = world->GetStreamingLevels();
 	const short LevelsSize = Levels.Num();
 
+	bool alterTransform = !LevelsWithAlteredTransform.Contains(world);
+
 	for (int i = 0; i < LevelsSize; i++)
 	{
+		//GetAllSubLevels(Levels[i], TempLevels, alterTransform);
 		OutLevels.Add(Levels[i]);
-		GetAllSubLevels(Levels[i], TempLevels);
 	}
-
+	/*
+	if (alterTransform)
+	{
+		LevelsWithAlteredTransform.Add(world);
+	}
 
 	for (ULevelStreaming* Level : TempLevels)
 	{
 		OutLevels.Add(Level);
 	}
-
+	*/
 	GEngine->DestroyWorldContext(world);
 }
 
-void FEditorWindowModule::GetAllSubLevels(ULevelStreaming* level, TSet<ULevelStreaming*>& OutLevels) {
+//to be removed
+void FEditorWindowModule::GetAllSubLevels(ULevelStreaming* level, TSet<ULevelStreaming*>& OutLevels, bool AlterTransform) {
 	TSet<ULevel*> TempLevels;
 
 	UWorld* world = Cast<UWorld>(level->GetLoadedLevel()->GetOuter());
@@ -229,113 +327,178 @@ void FEditorWindowModule::GetAllSubLevels(ULevelStreaming* level, TSet<ULevelStr
 	const TArray<ULevelStreaming*> Levels = world->GetStreamingLevels();
 	const short LevelsSize = Levels.Num();
 
+	if (AlterTransform)
+	{
+		for (ULevelStreaming* SubLevel : Levels)
+		{
+			SubLevel->LevelTransform += level->LevelTransform;
+		}
+	}
+
 	for (int i = 0; i < LevelsSize; i++)
 	{
+		GetAllSubLevels(Levels[i], OutLevels, AlterTransform);
 		OutLevels.Add(Levels[i]);
-		GetAllSubLevels(Levels[i], OutLevels);
 	}
 
 	GEngine->DestroyWorldContext(world);
+}
+
+bool FEditorWindowModule::LoadFullLevel(UWorld* World, FTransform Transform, bool AddToGameLevels)
+{
+	TSet<ULevelStreaming*> AllLevels;
+
+	GetAllLevels(World, AllLevels);
+
+	bool success = false;
+	ULevelStreaming* LevelStream = ULevelStreamingDynamic::LoadLevelInstance(GEditor->GetEditorWorldContext().World(),
+																			World->GetPathName(),
+																			Transform.GetLocation(),
+																			Transform.Rotator(),
+																			success);
+	if (!success) return false;
+	LevelStream->SetFolderPath(FName("/" + World->GetName() + "_" + FString::FromInt(PIERenameCounter)));
+	FLinearColor RootLevelColor = LevelStream->LevelColor;
+
+	FEditorDelegates::RefreshLevelBrowser.Broadcast();
+	if(AddToGameLevels) GameLevels.Add(LevelStream, AllLevels);
+
+	for (ULevelStreaming* Level : AllLevels) {
+		FTransform SubLevelTransform = Level->LevelTransform + Transform;
+		LevelStream = ULevelStreamingDynamic::LoadLevelInstance(GEditor->GetEditorWorldContext().World(),
+																Level->GetLoadedLevel()->GetOuter()->GetPathName(),
+																SubLevelTransform.GetLocation(),
+																SubLevelTransform.Rotator(),
+																success);
+		if (!success) return false;
+		LevelStream->SetFolderPath(FName("/" + World->GetName() + "_" + FString::FromInt(PIERenameCounter)));
+		LevelStream->LevelColor = RootLevelColor;
+		FEditorDelegates::RefreshLevelBrowser.Broadcast();
+	}
+	PIERenameCounter++;
+	return true;
 }
 
 FReply FEditorWindowModule::BuildButtonClicked()
 {
 	if(!ErrorCheck()) return FReply::Handled();
 
-	TArray<ULevelStreaming*> Levels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
+	for (int i = 0; i < BuildNum; i++)
+	{
+		TArray<ULevelStreaming*> Levels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
 
-	FTransform Transform;
-	Transform.SetLocation(FVector(Levels.Num()*1000.0f, 0.0f, 0.0f));
-	Transform.SetRotation(FQuat::Identity);
+		FTransform Transform;
+		Transform.SetLocation(FVector(GameLevels.Num() * 1000.0f, 0.0f, 0.0f));
+		Transform.SetRotation(FQuat::Identity);
 
+		const TMap<FName, uint8*> DataTableRows = DataTable->GetRowMap();
+		TSet<FName> KeysSet;
+		int32 NrOfKeys = DataTableRows.GetKeys(KeysSet);
 
-	const TMap<FName, uint8*> DataTableRows = DataTable->GetRowMap();
-	TSet<FName> KeysSet;
-	int32 NrOfKeys = DataTableRows.GetKeys(KeysSet);
+		//FName RowName = KeysSet.Array()[FMath::RandRange(0, NrOfKeys - 1)];
+		FName RowName = KeysSet.Array()[i%NrOfKeys];
+		FWorldStruct* ChosenLevel = DataTable->FindRow<FWorldStruct>(RowName, "");
 
-	FName RowName = KeysSet.Array()[FMath::RandRange(0, NrOfKeys-1)];
-
-
-	FWorldStruct* ChosenLevel = DataTable->FindRow<FWorldStruct>(RowName, "");
-
-	UWorld* levelworld = ChosenLevel->World.LoadSynchronous();
-	TSet<ULevelStreaming*> AllLevels;
-	GetAllLevels(levelworld, AllLevels);
-
-	FText DialogText = FText::FromString(ChosenLevel->World.ToSoftObjectPath().ToString());
-	FMessageDialog::Open(EAppMsgType::Ok, DialogText);
-
-	ULevelStreaming* LevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
-																	*(ChosenLevel->World.ToSoftObjectPath().ToString()),
-																	ULevelStreamingAlwaysLoaded::StaticClass(),
-																	Transform);
-
-	LevelStream->RenameForPIE(Counter++);
-	for (ULevelStreaming* Level : AllLevels) {
-		//DialogText = FText::FromString(Level->GetLoadedLevel()->GetOuter()->GetPathName());
-		//FMessageDialog::Open(EAppMsgType::Ok, DialogText);
-
-		LevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
-																		*Level->GetLoadedLevel()->GetOuter()->GetPathName(),
-																		ULevelStreamingAlwaysLoaded::StaticClass(),
-																		Transform + Level->LevelTransform);
-	
-	
-
-		LevelStream->RenameForPIE(Counter++);
+		UWorld* levelworld = ChosenLevel->World.LoadSynchronous();
+		LoadFullLevel(levelworld, Transform);
 	}
+	
 	return FReply::Handled();
 }
 
-struct DataTableData
+FString FEditorWindowModule::ClearPathFormatting(FString InputString, FString RemoveFrom)
 {
-	TSet<FString> ReplaceWith;
-};
+	TArray<FString> TempArray;
+	InputString.ParseIntoArray(TempArray, *(RemoveFrom));
+	return TempArray[0];
+}
 
 FReply FEditorWindowModule::ReplaceButtonClicked()
 {
 	if (!ErrorCheck()) return FReply::Handled();
 
+	const TMap<FName, uint8*> DataTableRows = DataTable->GetRowMap();
 	const TArray<ULevelStreaming*> StreamedLevels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
-	const TMap<FName, uint8*> RowMap = DataTable->GetRowMap();
 
-	for (ULevelStreaming* StreamedLevel : StreamedLevels)
+	FRandomStream RandomStream;
+	if (SeedNum == 0) {
+		RandomStream.GenerateNewSeed();
+		SeedNum = RandomStream.GetCurrentSeed();
+	}
+	else {
+		RandomStream.Initialize(SeedNum);
+	}
+
+	int32 CreatedLevelNumber = 0;
+	//for each row in user datatable
+	for (TPair<FName, uint8*> Row : DataTableRows)
 	{
-		TArray<FString> Out;
-		TArray<FString> Out2;
-		StreamedLevel->GetLoadedLevel()->GetPathName().ParseIntoArray(Out, TEXT("/"), true);
-		Out[4].ParseIntoArray(Out2, TEXT("."), true);
+		FWorldStruct* RowData = (FWorldStruct*)Row.Value;
+		RowData->World.LoadSynchronous();
+		UWorld* RowWorld = RowData->World.Get();
+		TSet<TSoftObjectPtr<UWorld>> RowReplaceWorlds = RowData->ReplaceWorlds;
 
-		FString CurrentLevelName = Out2[0];
-
-		CurrentLevelName.ParseIntoArray(Out, TEXT("_"), true);
-
-		FString OriginalLevelName = Out[2];
-
-		/*
-		//iterate through the datatable
-		for (auto& Row : RowMap)
+		TMap<ULevelStreaming*, TSet<ULevelStreaming*>> InstancedGameLevels(GameLevels);
+		//for each created level
+		for (TPair<ULevelStreaming*, TSet<ULevelStreaming*>> InstancedLevel : InstancedGameLevels)
 		{
-			if (Row.Key.ToString() != OriginalLevelName) continue;
+			//hotfix
+			if (InstancedLevel.Key == nullptr || InstancedLevel.Key->GetLoadedLevel() == nullptr) continue;
+			FString Path1 = ClearPathFormatting(InstancedLevel.Key->GetLoadedLevel()->GetOuter()->GetPathName(), "_LevelInstance_");
+			FString Path2 = ClearPathFormatting(RowWorld->GetPathName(), ".");
+			if (Path1 == Path2)
+			{
+				//if set for deletion
+				if (DeleteOnReplace)
+				{
+					for (ULevelStreaming* InstancedSubLevel : InstancedLevel.Value)
+					{
+						for (ULevelStreaming* InstancedSublevelWorld : StreamedLevels)
+						{
+							if (InstancedSublevelWorld->GetIsRequestingUnloadAndRemoval()) continue;
+							if (InstancedSublevelWorld->GetCurrentState() == ULevelStreaming::ECurrentState::Removed || InstancedSublevelWorld->GetLoadedLevel() == nullptr) continue;
+							FString p1 = ClearPathFormatting(InstancedSubLevel->GetLoadedLevel()->GetOuter()->GetPathName(), ".");
+							FString p2 = ClearPathFormatting(InstancedSublevelWorld->GetLoadedLevel()->GetOuter()->GetPathName(), "_LevelInstance_");
+							if (p1 == p2)
+							{
 
-			TSet<FString> ReplaceWith = ((DataTableData*)Row.Value)->ReplaceWith;
+								EditorLevelUtils::RemoveLevelFromWorld(InstancedSublevelWorld->GetLoadedLevel());
+								break;
+							}
+						}
+					}
+					GameLevels.Remove(InstancedLevel.Key);
 
-			unsigned short RandomIndex = FMath::RandRange(0, ReplaceWith.Num() - 1);
-			FString LevelNameRand = ReplaceWith.Array()[RandomIndex];
 
-			FTransform StreamedLevelTransform = StreamedLevel->LevelTransform;
 
-			ULevelStreaming* NewLevelStream = EditorLevelUtils::AddLevelToWorld(GEditor->GetEditorWorldContext().World(),
-																				*(FolderPath + LevelNameRand),
-																				ULevelStreamingAlwaysLoaded::StaticClass(),
-																				StreamedLevelTransform);
-			NewLevelStream->RenameForPIE(Counter++);
-			
-			EditorLevelUtils::RemoveLevelFromWorld(StreamedLevel->GetLoadedLevel());
+					//TODO: remove the created folder somehow (rebooting the Worldbrowser module does the trick but an internam check fails :<)
+					/*
+					UObject* FolderPtr = InstancedLevel.Key->GetOutermostObject();
+					FName FolderPath = InstancedLevel.Key->GetFolderPath();
+					InstancedLevel.Key->GetFolderRootObject()
 
-			break;
+					FFolder Folder2 = FFolder::GetWorldRootFolder((UWorld*)InstancedLevel.Key->GetLoadedLevel()->GetOuter());
+					UObject* FolderPtr2 = Folder2.GetRootObjectPtr();
+
+					FolderPtr->ConditionalBeginDestroy();
+					*/
+
+					//FWorldBrowserModule* WBModule = (FWorldBrowserModule*)FModuleManager::Get().GetModule(TEXT("Worldbrowser"));
+					//TSharedPtr<FLevelCollectionModel> WorldModel = WBModule->SharedWorldModel((UWorld*)GEditor->GetEditorWorldContext().World());
+					//WBModule->ShutdownModule();
+					//WBModule->StartupModule();
+
+					EditorLevelUtils::RemoveLevelFromWorld(InstancedLevel.Key->GetLoadedLevel());
+
+					FEditorDelegates::RefreshLevelBrowser.Broadcast();
+				}
+				
+				int32 RandomNumer = RandomStream.RandRange(0, RowReplaceWorlds.Num() - 1);
+				
+				UWorld* ReplaceWorld = RowReplaceWorlds.Array()[RandomNumer].LoadSynchronous();
+				LoadFullLevel(ReplaceWorld, InstancedLevel.Key->LevelTransform, DeleteOnReplace);
+			}
 		}
-		*/
 	}
 
 	return FReply::Handled();
