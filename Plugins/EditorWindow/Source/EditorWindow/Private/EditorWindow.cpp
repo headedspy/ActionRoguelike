@@ -122,7 +122,7 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 						if (DataTable->GetRowStructName() != "WorldStruct") return false;
 						return true;
 					})
-					/*
+					*/
 					.OnObjectChanged_Lambda([this](const FAssetData& Data) {
 						if (Data.IsValid())
 						{
