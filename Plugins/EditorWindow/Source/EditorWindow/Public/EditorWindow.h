@@ -6,7 +6,7 @@
 #include "Modules/ModuleManager.h"
 #include "EditorWindow.generated.h"
 
-// Struct to use in creating the datatable
+// Struct to use for creating the datatable
 USTRUCT(BlueprintType)
 struct FWorldStruct : public FTableRowBase
 {
@@ -22,8 +22,6 @@ struct FWorldStruct : public FTableRowBase
 class FToolBarBuilder;
 class FMenuBuilder;
 class FReply;
-class UUserDefinedStruct;
-
 
 class FEditorWindowModule : public IModuleInterface
 {
@@ -42,12 +40,9 @@ private:
 
 	FReply BuildButtonClicked();
 	FReply ReplaceButtonClicked();
-
-	AActor* AddActor(TSubclassOf<AActor> ActorClass, FTransform Transform);
+	FReply ChangeStreamingLevelsMode();
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
-
-
 
 private:
 	TSharedPtr<class FUICommandList> PluginCommands;
@@ -58,23 +53,32 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	UDataTable* DataTable;
 
-	unsigned short PIERenameCounter;
+	uint16 BuildNum;
+	uint16 SeedNum;
 
-	int32 BuildNum;
-	int32 SeedNum;
+	bool RandomizeSeed;
 
-	bool DeleteOnReplace;
+	unsigned short PIEFolderNameCounter;
 
 	bool ErrorCheck();
 
-	void CheckboxButtonStateChanged(ECheckBoxState IState);
+	// streamed level and his streamed sub-levels
+	TMap<ULevelStreaming*, TSet<ULevelStreaming*>> GameLevels;
 
+	// original levels and their replacement level
+	TSet<TPair<ULevelStreaming*, ULevelStreaming*>> ReplacementLevels;
+
+	// get all sublevels contained in a world
 	void GetAllLevels(UWorld* world, TSet<ULevelStreaming*>& OutLevels);
-	void GetAllSubLevels(ULevelStreaming* level, TSet<ULevelStreaming*>& OutLevels, bool AlterTransform);
+
 	FString ClearPathFormatting(FString InputString, FString RemoveFrom);
 
-	bool LoadFullLevel(UWorld* World, FTransform Transform, bool AddToGameLevels=true);
+	//returns root level stream or nullptr if fail
+	ULevelStreaming* LoadFullLevel(UWorld* World, FTransform Transform);
 
-	TMap<ULevelStreaming*, TSet<ULevelStreaming*>> GameLevels;
-	TSet<UWorld*> LevelsWithAlteredTransform;
+	bool UnloadFullLevel(ULevelStreaming* LevelStream);
+
+	//helper function to remove sublevel form edito world
+	void RemoveSubLevelFromWorld(ULevelStreaming* LevelStream);
+
 };
