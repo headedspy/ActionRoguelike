@@ -116,29 +116,14 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 					.DisplayUseSelected(true)
 					.EnableContentPicker(true)
 					.AllowClear(false)
-					/*
-					.OnShouldSetAsset_Lambda([this](const FAssetData& Data) {
+					.OnShouldFilterAsset_Lambda([this](const FAssetData& Data) {
 						DataTable = Cast<UDataTable>(Data.GetAsset());
-						if (DataTable->GetRowStructName() != "WorldStruct") return false;
+						if (DataTable->RowStruct == FWorldStruct::StaticStruct()) return false;
 						return true;
 					})
-					*/
 					.OnObjectChanged_Lambda([this](const FAssetData& Data) {
-						if (Data.IsValid())
-						{
-							DataTablePath = Data.GetObjectPathString();
-							DataTable = Cast<UDataTable>(Data.GetAsset());
-
-							//check if selected datatable is created from WorldStruct
-							if (DataTable->GetRowStructName() != "WorldStruct")
-							{
-								FText DialogText = FText::FromString("Table must be created from WorldStruct!");
-								FMessageDialog::Open(EAppMsgType::Ok, DialogText);
-
-								DataTable = nullptr;
-								DataTablePath = "";
-							}
-						}
+						DataTablePath = Data.GetObjectPathString();
+						DataTable = Cast<UDataTable>(Data.GetAsset());
 					})
 					.ObjectPath_Lambda([this]() { return DataTablePath; })
 				]
