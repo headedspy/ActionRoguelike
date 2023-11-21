@@ -4,7 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
+#include <UObject/ObjectMacros.h>
 #include "EditorWindow.generated.h"
+
 
 // Struct to use for creating the datatable
 USTRUCT(BlueprintType)
@@ -39,7 +41,7 @@ private:
 	void RegisterMenus();
 
 	FReply BuildButtonClicked();
-	FReply ReplaceButtonClicked();
+	FReply GenerateButtonClicked();
 	FReply ChangeStreamingLevelsMode();
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
@@ -57,7 +59,9 @@ private:
 	uint16 SeedNum;
 
 	bool RandomizeSeed;
+	bool TrackLevels;
 
+	unsigned short PIELevelNameCounter;
 	unsigned short PIEFolderNameCounter;
 
 	bool ErrorCheck();
@@ -71,14 +75,18 @@ private:
 	// get all sublevels contained in a world
 	void GetAllLevels(UWorld* world, TSet<ULevelStreaming*>& OutLevels);
 
-	FString ClearPathFormatting(FString InputString, FString RemoveFrom);
+	FString ClearPathFormatting(FString InputString);
 
 	//returns root level stream or nullptr if fail
 	ULevelStreaming* LoadFullLevel(UWorld* World, FTransform Transform);
 
 	bool UnloadFullLevel(ULevelStreaming* LevelStream);
 
-	//helper function to remove sublevel form edito world
+	//function binded to FEditorDelegates::OnAddLevelToWorld event, invoked when a level is added through the levels menu
+	UFUNCTION()
+	void ManualAddLevel(ULevel* Level);
+
+	//helper function to remove sublevel form editor world
 	void RemoveSubLevelFromWorld(ULevelStreaming* LevelStream);
 
 };
