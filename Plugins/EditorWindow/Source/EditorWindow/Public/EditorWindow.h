@@ -75,16 +75,21 @@ private:
 	// get all sublevels contained in a world
 	void GetAllLevels(UWorld* world, TSet<ULevelStreaming*>& OutLevels);
 
+	// clear all engine formatting of a level path
 	FString ClearPathFormatting(FString InputString);
 
-	//returns root level stream or nullptr if fail
+	//returns root level stream
 	ULevelStreaming* LoadFullLevel(UWorld* World, FTransform Transform);
 
-	bool UnloadFullLevel(ULevelStreaming* LevelStream);
+	void UnloadFullLevel(ULevelStreaming* LevelStream);
 
 	//function binded to FEditorDelegates::OnAddLevelToWorld event, invoked when a level is added through the levels menu
 	UFUNCTION()
 	void ManualAddLevel(ULevel* Level);
+
+	//function binded to FEditorDelegates::MapChange event, invoked when the map is changed in the editor
+	UFUNCTION()
+	void EditorMapChange(uint32 flags);
 
 	//helper function to remove sublevel form editor world
 	void RemoveSubLevelFromWorld(ULevelStreaming* LevelStream);

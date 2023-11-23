@@ -68,6 +68,7 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 	PIELevelNameCounter = 0;
 	PIEFolderNameCounter = 0;
 	BuildNum = 0;
+	FEditorDelegates::MapChange.AddRaw(this, &FEditorWindowModule::EditorMapChange);
 	FEditorDelegates::OnAddLevelToWorld.AddRaw(this, &FEditorWindowModule::ManualAddLevel);
 
 	return SNew(SDockTab)
@@ -350,7 +351,7 @@ ULevelStreaming* FEditorWindowModule::LoadFullLevel(UWorld* World, FTransform Tr
 																			Transform.GetLocation(),
 																			Transform.Rotator(),
 																			success);
-	if (!success) return nullptr;
+	ensure(success);
 	
 	RootLevelStream->RenameForPIE(PIELevelNameCounter++);
 
@@ -372,7 +373,7 @@ ULevelStreaming* FEditorWindowModule::LoadFullLevel(UWorld* World, FTransform Tr
 																SubLevelTransform.Rotator(),
 																success);
 
-		if (!success) return nullptr;
+		ensure(success);
 
 		LevelStream->RenameForPIE(PIELevelNameCounter++);
 		LevelStream->SetFolderPath(FName("/" + World->GetName() + "_" + FString::FromInt(PIEFolderNameCounter)));
@@ -409,7 +410,6 @@ void FEditorWindowModule::ManualAddLevel(ULevel* Level)
 
 			FLinearColor RootLevelColor = StreamingLevel->LevelColor;
 
-			FEditorDelegates::RefreshLevelBrowser.Broadcast();
 			GameLevels.Add(StreamingLevel, AllLevels);
 
 			for (ULevelStreaming* Level : AllLevels) {
@@ -422,7 +422,7 @@ void FEditorWindowModule::ManualAddLevel(ULevel* Level)
 																						 SubLevelTransform.Rotator(),
 																						 success);
 
-				if (!success) return;
+				ensure(success);
 
 				LevelStream->RenameForPIE(PIELevelNameCounter++);
 				LevelStream->SetFolderPath(FName("/" + LevelWorld->GetName() + "_" + FString::FromInt(PIEFolderNameCounter)));
@@ -431,16 +431,30 @@ void FEditorWindowModule::ManualAddLevel(ULevel* Level)
 
 			if (AllLevels.Num() != 0) 
 				PIEFolderNameCounter++;
-
 			break;
 		}
 	}
+}
 
+void FEditorWindowModule::EditorMapChange(uint32 flags)
+{
+	GameLevels.Empty();
+	ReplacementLevels.Empty();
+
+
+	//cleanup empty folders by rebooting worldbrowser module
+	FWorldBrowserModule& WBModule = FModuleManager::LoadModuleChecked<FWorldBrowserModule>("WorldBrowser");
+	TSharedPtr<FLevelCollectionModel> WorldModel = WBModule.SharedWorldModel(GEditor->GetEditorWorldContext().World());
+
+	WorldModel.Reset();
+	WBModule.ShutdownModule();
+	WBModule.StartupModule();
+
+	WBModule.OnBrowseWorld.Broadcast(GEditor->GetEditorWorldContext().World());
 }
 
 void FEditorWindowModule::RemoveSubLevelFromWorld(ULevelStreaming* LevelStream)
 {
-	if (LevelStream->GetLoadedLevel() == nullptr) return;
 	TArray<ULevel*> Levels = GEditor->GetEditorWorldContext().World()->GetLevels();
 
 	for (ULevel* LoadedLevel : Levels)
@@ -448,40 +462,55 @@ void FEditorWindowModule::RemoveSubLevelFromWorld(ULevelStreaming* LevelStream)
 		//compare levels by their BuildDataId
 		if (LoadedLevel->LevelBuildDataId == LevelStream->GetLoadedLevel()->LevelBuildDataId)
 		{
-			UEditorLevelUtils::RemoveLevelFromWorld(LoadedLevel);
+			ensure(UEditorLevelUtils::RemoveLevelFromWorld(LoadedLevel));
 			break;
 		}
 	}
 }
 
-bool FEditorWindowModule::UnloadFullLevel(ULevelStreaming* LevelStream)
+void FEditorWindowModule::UnloadFullLevel(ULevelStreaming* LevelStream)
 {
-	FWorldBrowserModule* WBModule = (FWorldBrowserModule*)FModuleManager::Get().GetModule(TEXT("Worldbrowser"));
-	TSharedPtr<FLevelCollectionModel> WorldModel = WBModule->SharedWorldModel((UWorld*)(LevelStream->GetLoadedLevel()->GetOuter()));
-
-	((UWorld*)LevelStream->GetLoadedLevel()->GetOuter())->CleanupWorld();
+	//if the level has already been manually removed
+	if (LevelStream->GetCurrentState() == ULevelStreaming::ECurrentState::Removed ||
+		LevelStream->GetCurrentState() == ULevelStreaming::ECurrentState::Unloaded)
+	{
+		//remove track and all sub-levels
+		if (GameLevels.Contains(LevelStream))
+		{
+			TSet<ULevelStreaming*> SubLevels = GameLevels[LevelStream];
+			for (ULevelStreaming* SubLevel : SubLevels)
+			{
+				RemoveSubLevelFromWorld(SubLevel);
+			}
+			GameLevels.Remove(LevelStream);
+		}
+		return;
+	}
 
 	//remove all sublevels
 	TSet<ULevelStreaming*> SubLevels = GameLevels[LevelStream];
+
+	FWorldBrowserModule& WBModule = FModuleManager::LoadModuleChecked<FWorldBrowserModule>("WorldBrowser");
+	TSharedPtr<FLevelCollectionModel> WorldModel = WBModule.SharedWorldModel((UWorld*)LevelStream->GetLoadedLevel()->GetOuter());
+
 	for (ULevelStreaming* SubLevel : SubLevels)
 	{
 		RemoveSubLevelFromWorld(SubLevel);
 	}
 
-
 	//remove root level stream
-	UEditorLevelUtils::RemoveLevelFromWorld(LevelStream->GetLoadedLevel());
+	ensure(UEditorLevelUtils::RemoveLevelFromWorld(LevelStream->GetLoadedLevel()));
 
-	//delete empty folder by restarting the worldbrowser module
-	WorldModel = nullptr;
+	//cleanup empty folder by rebooting worldbrowser module
+	WorldModel.Reset();
+	WBModule.ShutdownModule();
+	WBModule.StartupModule();
 
-	WBModule->ShutdownModule();
-	WBModule->StartupModule();
+	WBModule.OnBrowseWorld.Broadcast(GEditor->GetEditorWorldContext().World());
+
 
 	FEditorDelegates::RefreshLevelBrowser.Broadcast();
 	GameLevels.Remove(LevelStream);
-
-	return true;
 }
 
 
@@ -526,6 +555,7 @@ FReply FEditorWindowModule::GenerateButtonClicked()
 		RandomStream.Initialize(SeedNum);
 	}
 
+	const TMap<ULevelStreaming*, TSet<ULevelStreaming*>> InstancedGameLevels = TMap<ULevelStreaming*, TSet<ULevelStreaming*>>(GameLevels);
 	TArray<ULevelStreaming*> LevelsToRemove;
 
 	//for each row in user datatable
@@ -538,10 +568,27 @@ FReply FEditorWindowModule::GenerateButtonClicked()
 		TSet<TSoftObjectPtr<UWorld>> RowReplaceWorlds = RowData->ReplaceWorlds;
 
 		//for each created level
-		const TMap<ULevelStreaming*, TSet<ULevelStreaming*>> InstancedGameLevels = TMap<ULevelStreaming*, TSet<ULevelStreaming*>>(GameLevels);
 		for (TPair<ULevelStreaming*, TSet<ULevelStreaming*>> InstancedLevel : InstancedGameLevels)
 		{
-			if (InstancedLevel.Key->GetLoadedLevel() == nullptr) continue;
+			//if the level was removed manually before gerenation
+			if (InstancedLevel.Key->GetCurrentState() == ULevelStreaming::ECurrentState::Removed ||
+				InstancedLevel.Key->GetCurrentState() == ULevelStreaming::ECurrentState::Unloaded) {
+				GameLevels.Remove(InstancedLevel.Key);
+
+				//remove any replacement levels it might have
+				for (TPair<ULevelStreaming*, ULevelStreaming*> ReplacementLevel : ReplacementLevels)
+				{
+					if (ReplacementLevel.Key == InstancedLevel.Key)
+					{
+						LevelsToRemove.Add(ReplacementLevel.Value);
+						ReplacementLevels.Remove(ReplacementLevel);
+
+						break;
+					}
+				}
+
+				continue;
+			}
 
 			// Find the instanced level by name
 			FString InstancedLevelPath = ClearPathFormatting(InstancedLevel.Key->GetLoadedLevel()->GetOuter()->GetPathName());
@@ -573,12 +620,14 @@ FReply FEditorWindowModule::GenerateButtonClicked()
 				ReplacementLevels.Add(Pair);
 			}
 		}
-	}
 
-	//remove all levels
-	for (ULevelStreaming* LevelToRemove : LevelsToRemove)
-	{
-		UnloadFullLevel(LevelToRemove);
+		//remove all levels
+		for (ULevelStreaming* LevelToRemove : LevelsToRemove)
+		{
+			UnloadFullLevel(LevelToRemove);
+		}
+
+		GEditor->ForceGarbageCollection(true);
 	}
 
 	return FReply::Handled();
