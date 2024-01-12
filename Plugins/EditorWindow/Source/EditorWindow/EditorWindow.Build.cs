@@ -43,8 +43,8 @@ public class EditorWindow : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-				"PCG",
-				"DesktopWidgets",
+                "DesktopWidgets",
+				"DesktopPlatform",
                 "PropertyEditor",
                 "EditorScriptingUtilities"
 				// ... add private dependencies that you statically link with here ...	

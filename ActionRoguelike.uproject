@@ -23,7 +23,7 @@
 			]
 		},
 		{
-			"Name": "PCG",
+			"Name": "EditorWindow",
 			"Enabled": true
 		}
 	]

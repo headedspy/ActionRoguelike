@@ -5,12 +5,14 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 #include <UObject/ObjectMacros.h>
+#include "PluginManager.h"
+#include "GeneratorActor.h"
 #include "EditorWindow.generated.h"
 
 
-// Struct to use for creating the datatable
+// Helper structs (TPair cant work on UPROPERTY)
 USTRUCT(BlueprintType)
-struct FWorldStruct : public FTableRowBase
+struct FWeightedWorld
 {
 	GENERATED_BODY()
 
@@ -18,14 +20,95 @@ struct FWorldStruct : public FTableRowBase
 	TSoftObjectPtr<UWorld> World;
 
 	UPROPERTY(EditAnywhere)
-	TSet<TSoftObjectPtr<UWorld>> ReplaceWorlds;
+	uint16 Weight;
 };
 
-class FToolBarBuilder;
-class FMenuBuilder;
-class FReply;
+USTRUCT(BlueprintType)
+struct FWeightedActor
+{
+	GENERATED_BODY()
 
-class FEditorWindowModule : public IModuleInterface
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<AActor> Actor;
+
+	UPROPERTY(EditAnywhere)
+	uint16 Weight;
+};
+
+// hash function for the helper stucts, used when they get put in a set
+inline uint32 GetTypeHash(const FWeightedWorld& World)
+{
+	return FCrc::MemCrc32(&World, sizeof(FWeightedWorld));
+}
+
+inline uint32 GetTypeHash(const FWeightedActor& Actor)
+{
+	return FCrc::MemCrc32(&Actor, sizeof(FWeightedActor));
+}
+
+
+// Structs to use for the levels datatables
+USTRUCT(BlueprintType)
+struct FLevelsStruct : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<UWorld> World;
+
+	UPROPERTY(EditAnywhere)
+	TSet<FWeightedWorld> ReplaceWorlds;
+};
+
+
+USTRUCT(BlueprintType)
+struct FTagsStruct : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	FName ActorTag;
+
+	UPROPERTY(EditAnywhere)
+	uint8 NumberOfElements;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<AActor> ReplaceActor;
+};
+
+USTRUCT(BlueprintType)
+struct FActorsStruct : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<AActor> Actor;
+
+	UPROPERTY(EditAnywhere)
+	TSet<FWeightedActor> ReplaceActors;
+};
+
+// enum for generation algorithm execution method
+#undef CPP
+enum ExecutionMethod : uint8 { Python, Blueprint, CPP };
+
+// helper function to convert the enum to string for the UI
+inline FString ExecutionMethodToString(ExecutionMethod Method)
+{
+	switch (Method)
+	{
+	case ExecutionMethod::Python:
+		return "Python";
+	case ExecutionMethod::Blueprint:
+		return "Blueprint";
+	case ExecutionMethod::CPP:
+		return "C++";
+	}
+	return "INVALID";
+}
+
+class FReply;
+class FEditorWindowModule : public IModuleInterface, public PluginManager
 {
 public:
 
@@ -40,58 +123,68 @@ private:
 
 	void RegisterMenus();
 
-	FReply BuildButtonClicked();
-	FReply GenerateButtonClicked();
-	FReply ChangeStreamingLevelsMode();
+	FReply GenerateLevelsButtonClicked();
+	FReply GenerateTagsButtonClicked();
+	FReply GenerateActorsButtonClicked();
+	FReply MergeButtonClicked();
+	FReply OpenFileButtonClicked();
+	FReply ExecuteScriptButtonClicked();
 
 	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
 
 private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 
-	UPROPERTY()
-	FString DataTablePath;
+	UDataTable* ActorsDataTable;
+	UDataTable* TagsDataTable;
 
-	UPROPERTY(EditDefaultsOnly)
-	UDataTable* DataTable;
+	// paths for the selected assets used in the dropdown menus
+	FString GeneratorClassPath;
+	FString LevelsDataTablePath;
+	FString TagsDataTablePath;
+	FString ActorsDataTablePath;
+	FString GeneratorBPPath;
 
-	uint16 BuildNum;
-	uint16 SeedNum;
+	// selected generator assets
+	AGeneratorActor* GeneratorBP;
+	UClass* GeneratorClass;
 
-	bool RandomizeSeed;
-	bool TrackLevels;
+	// generation randomization seeds
+	bool RandomizeLevelsSeed;
+	bool RandomizeTagsSeed;
+	bool RandomizeActorsSeed;
+	uint16 LevelsSeedNum;
+	uint16 TagsSeedNum;
+	uint16 ActorsSeedNum;
 
-	unsigned short PIELevelNameCounter;
-	unsigned short PIEFolderNameCounter;
+	// Used by the execution method combobox selector
+	TArray<TSharedPtr<ExecutionMethod>> ComboItems;
+	TSharedPtr<STextBlock> ComboBoxTitleBlock;
 
-	bool ErrorCheck();
+	// selected execution method
+	ExecutionMethod Selection;
 
-	// streamed level and his streamed sub-levels
-	TMap<ULevelStreaming*, TSet<ULevelStreaming*>> GameLevels;
+	// path to the selected python script
+	FString FilePath;
 
-	// original levels and their replacement level
-	TSet<TPair<ULevelStreaming*, ULevelStreaming*>> ReplacementLevels;
-
-	// get all sublevels contained in a world
-	void GetAllLevels(UWorld* world, TSet<ULevelStreaming*>& OutLevels);
+	// check the Value statement and log a message if it's false; returns the Value
+	bool CheckAndLog(bool Value, FString MessageToLog);
 
 	// clear all engine formatting of a level path
 	FString ClearPathFormatting(FString InputString);
 
-	//returns root level stream
-	ULevelStreaming* LoadFullLevel(UWorld* World, FTransform Transform);
 
-	void UnloadFullLevel(ULevelStreaming* LevelStream);
-
-	//function binded to FEditorDelegates::OnAddLevelToWorld event, invoked when a level is added through the levels menu
+	// binded to FEditorDelegates::OnAddLevelToWorld event, invoked after a level is added through the levels menu
 	UFUNCTION()
 	void ManualAddLevel(ULevel* Level);
 
-	//function binded to FEditorDelegates::MapChange event, invoked when the map is changed in the editor
+	// binded to FEditorDelegates::MapChange event, invoked when the map is changed in the editor
 	UFUNCTION()
 	void EditorMapChange(uint32 flags);
 
-	//helper function to remove sublevel form editor world
-	void RemoveSubLevelFromWorld(ULevelStreaming* LevelStream);
+	// move all actors from the given level into the persistent level
+	void MoveAllActorsFromLevel(ULevelStreaming* LevelStream);
 
+	// return random actor from a list of weighted actors using a given random stream
+	UClass* WeightedRandomActor(TSet<FWeightedActor> WeightedActors, FRandomStream& RandomStream, uint16 SumOfWeights);
 };
