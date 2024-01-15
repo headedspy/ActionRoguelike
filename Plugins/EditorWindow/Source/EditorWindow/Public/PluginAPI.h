@@ -27,19 +27,20 @@ public:
 	// get the levels datatable
 	UFUNCTION(BlueprintPure, Category="PluginAPI")
 	static UDataTable* GetLevelsDataTable();
+
 	// spawn level from world asset path, returns all spawned levels
 	UFUNCTION(BlueprintCallable, Category="PluginAPI")
-	static TSet<ULevelStreaming*> SpawnLevel(FString LevelPath, FVector Position, FRotator Rotation);
+	static ULevelStreaming* SpawnLevel(FString LevelPath, FVector Position, FRotator Rotation);
 
 	// delete all streamed levels from the editor world
 	UFUNCTION(BlueprintCallable, Category="PluginAPI")
 	static void ClearAllLevels();
 
 	UFUNCTION(BlueprintCallable, Category="PluginAPI")
-	static TArray<AGateway*> GetLevelGateways(TSet<ULevelStreaming*> Level);
+	static TArray<AGateway*> GetLevelGateways(ULevelStreaming* Level);
 
 	UFUNCTION(BlueprintCallable, Category = "PluginAPI")
-	static void AttachLevelToGateway(AGateway* OutGateway, TSet<ULevelStreaming*> Level, AGateway* InGateway, bool DeleteGateways = true);
+	static void AttachLevelToGateway(AGateway* OutGateway, ULevelStreaming* Level, AGateway* InGateway, bool DeleteGateways = true);
 
 protected:
 };

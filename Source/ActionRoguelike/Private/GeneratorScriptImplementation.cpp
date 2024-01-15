@@ -16,10 +16,17 @@ void UGeneratorScriptImplementation::OnGenerateButtonPressed()
 	TArray<FString> Levels = UDataTableFunctionLibrary::GetDataTableColumnAsString(LevelsDataTable, "World");
 	FVector SpawnPoint = FVector(0.0f ,0.0f, 0.0f);
 
-	for (int i = 0; i < 5; i++)
+
+	int RandomIndex = FMath::RandRange(0, Levels.Num() - 1);
+	ULevelStreaming* Level = UPluginAPI::SpawnLevel(Levels[RandomIndex], SpawnPoint, FRotator(0.0f, 0.0f, 0.0f));
+	TArray<AGateway*> NewGateways = UPluginAPI::GetLevelGateways(Level);
+
+	for (int i = 0; i < 4; i++)
 	{
-		int RandomIndex = FMath::RandRange(0, Levels.Num()-1);
-		UPluginAPI::SpawnLevel(Levels[RandomIndex], SpawnPoint, FRotator(0.0f, 0.0f, 0.0f));
-		SpawnPoint += FVector(1000.0f, 0.0f, 0.0f);
+		RandomIndex = FMath::RandRange(0, Levels.Num()-1);
+		Level = UPluginAPI::SpawnLevel(Levels[RandomIndex], SpawnPoint, FRotator(0.0f, 0.0f, 0.0f));
+		TArray<AGateway*> Gateways = UPluginAPI::GetLevelGateways(Level);
+		UPluginAPI::AttachLevelToGateway(NewGateways[FMath::RandRange(0, NewGateways.Num()-1)], Level, Gateways[FMath::RandRange(0, Gateways.Num()-1)]);
+		NewGateways = UPluginAPI::GetLevelGateways(Level);
 	}
 }

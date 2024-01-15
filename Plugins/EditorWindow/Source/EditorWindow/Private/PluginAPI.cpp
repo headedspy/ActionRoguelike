@@ -17,7 +17,7 @@ UDataTable* UPluginAPI::GetLevelsDataTable()
 	return PluginManager::GetLevelsDataTable();
 }
 
-TSet<ULevelStreaming*> UPluginAPI::SpawnLevel(FString LevelPath, FVector Position, FRotator Rotation)
+ULevelStreaming* UPluginAPI::SpawnLevel(FString LevelPath, FVector Position, FRotator Rotation)
 {
 	UWorld* World = LoadObject<UWorld>(GetTransientPackage(), *LevelPath);
 	ensure(World);
@@ -25,7 +25,7 @@ TSet<ULevelStreaming*> UPluginAPI::SpawnLevel(FString LevelPath, FVector Positio
 
 	TSet<ULevelStreaming*> LevelsStreamed = PluginManager::LoadFullLevel(World, Transform, "", FColor::MakeRandomColor());
 
-	return LevelsStreamed;
+	return LevelsStreamed.Array()[0];
 }
 
 void UPluginAPI::ClearAllLevels()
@@ -38,14 +38,13 @@ void UPluginAPI::ClearAllLevels()
 	}
 }
 
-TArray<AGateway*> UPluginAPI::GetLevelGateways(TSet<ULevelStreaming*> Level)
+TArray<AGateway*> UPluginAPI::GetLevelGateways(ULevelStreaming* Level)
 {
 	//load unloaded levels
 	GWorld->UpdateLevelStreaming();
 	TArray<AGateway*> Gateways;
 
-	ULevelStreaming* RootLevel = Level.Array()[0];
-	TArray<AActor*> GatewayActors = RootLevel->GetLoadedLevel()->Actors;
+	TArray<AActor*> GatewayActors = Level->GetLoadedLevel()->Actors;
 
 	for (AActor* GatewayActor : GatewayActors)
 	{
@@ -59,7 +58,7 @@ TArray<AGateway*> UPluginAPI::GetLevelGateways(TSet<ULevelStreaming*> Level)
 	return Gateways;
 }
 
-void UPluginAPI::AttachLevelToGateway(AGateway* OutGateway, TSet<ULevelStreaming*> Level, AGateway* InGateway, bool DeleteGateways)
+void UPluginAPI::AttachLevelToGateway(AGateway* OutGateway, ULevelStreaming* Level, AGateway* InGateway, bool DeleteGateways)
 {
 	//load unloaded levels
 	GWorld->UpdateLevelStreaming();
@@ -69,9 +68,11 @@ void UPluginAPI::AttachLevelToGateway(AGateway* OutGateway, TSet<ULevelStreaming
 	float OutYaw = OutGateway->GetTransform().Rotator().Yaw;
 	float InYaw = InGateway->GetTransform().Rotator().Yaw;
 
+	//calculate the rotation
 	FQuat Rotation = FRotator(0.f, + (180.0f + OutYaw - InYaw), 0.f).Quaternion();
 	NewTransform.SetRotation(Rotation);
 
+	//calculate the position
 	FVector OutPosition = OutGateway->GetTransform().GetLocation();
 	FVector InPosition = InGateway->GetTransform().GetLocation();
 	float Distance = FVector::Distance(OutPosition, InPosition + OutPosition);
@@ -79,11 +80,10 @@ void UPluginAPI::AttachLevelToGateway(AGateway* OutGateway, TSet<ULevelStreaming
 
 	NewTransform.SetLocation(OutPosition + ShiftVector);
 
-	for (ULevelStreaming* LevelStream : Level)
-	{
-		FLevelUtils::SetEditorTransform(LevelStream, NewTransform);
-	}
+	//set the level transform
+	FLevelUtils::SetEditorTransform(Level, NewTransform);
 
+	//delete the gateways
 	if (DeleteGateways)
 	{
 		GWorld->EditorDestroyActor(OutGateway, true);

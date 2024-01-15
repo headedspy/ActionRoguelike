@@ -71,8 +71,6 @@ void FEditorWindowModule::ShutdownModule()
 }
 
 #include "Widgets/Layout/SBorder.h"
-#include "Widgets/Input/SFilePathPicker.h"
-#include <Misc/OutputDeviceNull.h>
 
 TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
