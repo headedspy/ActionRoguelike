@@ -26,6 +26,7 @@
 #include "GeneratorActor.h"
 #include "GeneratorScript.h"
 #include <Kismet/KismetMathLibrary.h>
+#include "Widgets/Layout/SBorder.h"
 
 static const FName EditorWindowTabName("EditorWindow");
 
@@ -70,7 +71,6 @@ void FEditorWindowModule::ShutdownModule()
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(EditorWindowTabName);
 }
 
-#include "Widgets/Layout/SBorder.h"
 
 TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
@@ -78,6 +78,7 @@ TSharedRef<SDockTab> FEditorWindowModule::OnSpawnPluginTab(const FSpawnTabArgs& 
 	PIEFolderNameCounter = 0;
 	FEditorDelegates::MapChange.AddRaw(this, &FEditorWindowModule::EditorMapChange);
 	FEditorDelegates::OnAddLevelToWorld.AddRaw(this, &FEditorWindowModule::ManualAddLevel);
+	FEditorDelegates::RefreshLevelBrowser.AddRaw(this, &FEditorWindowModule::RefreshLevels);
 
 	ComboItems.Add(MakeShareable(new ExecutionMethod(Python)));
 	ComboItems.Add(MakeShareable(new ExecutionMethod(Blueprint)));
@@ -828,6 +829,38 @@ void FEditorWindowModule::EditorMapChange(uint32 flags)
 	WBModule.OnBrowseWorld.Broadcast(GEditor->GetEditorWorldContext().World());
 }
 
+void FEditorWindowModule::RefreshLevels()
+{
+	if (CurrentlyDeleting) return;
+
+	for (TPair<ULevelStreaming*, TSet<ULevelStreaming*>> Level : ReplacementLevels)
+	{
+		// remove replacement levels if layout level has been removed manually
+		if (Level.Key->GetCurrentState() == ULevelStreaming::ECurrentState::Removed)
+		{
+			CurrentlyDeleting = true;
+			for (ULevelStreaming* ReplacementLevel : Level.Value)
+			{
+				UnloadFullLevel(ReplacementLevel);
+			}
+
+			ReplacementLevels.Remove(Level.Key);
+			CurrentlyDeleting = false;
+			break;
+		}
+
+		// remove replacement levels from the list if they have been removed manually
+		TSet<ULevelStreaming*> ReplacementLevels_I(Level.Value);
+		for (ULevelStreaming* ReplacementLevel : ReplacementLevels_I)
+		{
+			if (ReplacementLevel->GetCurrentState() == ULevelStreaming::ECurrentState::Removed)
+			{
+				ReplacementLevels[Level.Key].Remove(ReplacementLevel);
+			}
+		}
+	}
+}
+
 void FEditorWindowModule::MoveAllActorsFromLevel(ULevelStreaming* LevelStream)
 {
 	TArray<AActor*> Actors = LevelStream->GetLoadedLevel()->Actors;
@@ -895,7 +928,8 @@ FReply FEditorWindowModule::GenerateLevelsButtonClicked()
 	{
 		//if the level was already removed, skip
 		if (StreamedLevel->GetCurrentState() == ULevelStreaming::ECurrentState::Removed ||
-			StreamedLevel->GetCurrentState() == ULevelStreaming::ECurrentState::Unloaded) continue;
+			StreamedLevel->GetCurrentState() == ULevelStreaming::ECurrentState::Unloaded ||
+			!IsValid(StreamedLevel)) continue;
 
 		// for each row
 		for (TPair<FName, uint8*> Row : DataTableRows)
@@ -933,6 +967,8 @@ FReply FEditorWindowModule::GenerateLevelsButtonClicked()
 							UnloadFullLevel(CreatedReplacementLevel);
 						}
 						ReplacementLevels.Remove(StreamedLevel);
+
+						GEditor->ForceGarbageCollection(true);
 						break;
 					}
 				}
@@ -971,8 +1007,6 @@ FReply FEditorWindowModule::GenerateLevelsButtonClicked()
 			}
 		}
 	}
-
-	GEditor->ForceGarbageCollection(true);
 
 	return FReply::Handled();
 }
@@ -1284,7 +1318,7 @@ FReply FEditorWindowModule::ExecuteScriptButtonClicked()
 			UBlueprint* BP = LoadObject<UBlueprint>(nullptr, *(GeneratorBPPath));
 			UClass* GeneratedClass = BP->GeneratedClass;
 			UFunction* Function = GeneratedClass->FindFunctionByName(FName(TEXT("OnGenerateButtonPressed")));
-
+			ensure(Function);
 			GeneratedClass->GetDefaultObject(true)->ProcessEvent(Function, nullptr);
 
 			break;

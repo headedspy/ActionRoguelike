@@ -60,7 +60,6 @@ struct FLevelsStruct : public FTableRowBase
 	TSet<FWeightedWorld> ReplaceWorlds;
 };
 
-
 USTRUCT(BlueprintType)
 struct FTagsStruct : public FTableRowBase
 {
@@ -135,6 +134,7 @@ private:
 private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 
+	// the datatables used by the plugin, LevelsDataTable is located in PluginManager
 	UDataTable* ActorsDataTable;
 	UDataTable* TagsDataTable;
 
@@ -150,12 +150,12 @@ private:
 	UClass* GeneratorClass;
 
 	// generation randomization seeds
-	bool RandomizeLevelsSeed;
-	bool RandomizeTagsSeed;
-	bool RandomizeActorsSeed;
 	uint16 LevelsSeedNum;
 	uint16 TagsSeedNum;
 	uint16 ActorsSeedNum;
+	bool RandomizeLevelsSeed;
+	bool RandomizeTagsSeed;
+	bool RandomizeActorsSeed;
 
 	// Used by the execution method combobox selector
 	TArray<TSharedPtr<ExecutionMethod>> ComboItems;
@@ -167,7 +167,10 @@ private:
 	// path to the selected python script
 	FString FilePath;
 
-	// check the Value statement and log a message if it's false; returns the Value
+	// stop the invoking of RefreshLevelBrowser logic when levels are deleted within
+	bool CurrentlyDeleting = false;
+
+	// check the Value expression and log a message if it's false; returns the Value
 	bool CheckAndLog(bool Value, FString MessageToLog);
 
 	// clear all engine formatting of a level path
@@ -181,6 +184,10 @@ private:
 	// binded to FEditorDelegates::MapChange event, invoked when the map is changed in the editor
 	UFUNCTION()
 	void EditorMapChange(uint32 flags);
+
+	// binded to FEditorDelegates::RefreshLevelBrowser event, invoked when the levels have changed
+	UFUNCTION()
+	void RefreshLevels();
 
 	// move all actors from the given level into the persistent level
 	void MoveAllActorsFromLevel(ULevelStreaming* LevelStream);

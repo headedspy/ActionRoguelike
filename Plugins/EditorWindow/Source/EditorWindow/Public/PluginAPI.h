@@ -11,6 +11,9 @@ UCLASS(Blueprintable)
 class EDITORWINDOW_API AGateway : public AActor
 {
 	GENERATED_BODY()
+public:
+	UPROPERTY(EditAnywhere)
+	bool EntryGateway;
 };
 
 UCLASS()
@@ -36,11 +39,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PluginAPI")
 	static void ClearAllLevels();
 
+	// get all the gateways for the laoded level
 	UFUNCTION(BlueprintCallable, Category="PluginAPI")
 	static TArray<AGateway*> GetLevelGateways(ULevelStreaming* Level);
 
+	// connect the given level to a gateway
 	UFUNCTION(BlueprintCallable, Category = "PluginAPI")
 	static void AttachLevelToGateway(AGateway* OutGateway, ULevelStreaming* Level, AGateway* InGateway, bool DeleteGateways = true);
-
-protected:
 };

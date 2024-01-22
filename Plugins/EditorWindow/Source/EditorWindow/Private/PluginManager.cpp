@@ -81,6 +81,19 @@ TSet<ULevelStreaming*> PluginManager::LoadFullLevel(UWorld* World, FTransform Tr
 	return LoadedLevels;
 }
 
+void PluginManager::ClearAll()
+{
+	TArray<ULevelStreaming*> Levels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
+
+	ReplacementLevels.Empty();
+	ReplacementActors.Empty();
+
+	for (ULevelStreaming* Level : Levels)
+	{
+		UnloadFullLevel(Level);
+	}
+}
+
 void PluginManager::RemoveSubLevelFromWorld(ULevelStreaming* LevelStream)
 {
 	TArray<ULevelStreaming*> Levels = GEditor->GetEditorWorldContext().World()->GetStreamingLevels();
@@ -102,7 +115,7 @@ void PluginManager::UnloadFullLevel(ULevelStreaming* LevelStream)
 	FWorldBrowserModule& WBModule = FModuleManager::LoadModuleChecked<FWorldBrowserModule>("WorldBrowser");
 	TSharedPtr<FLevelCollectionModel> WorldModel = WBModule.SharedWorldModel((UWorld*)LevelStream->GetLoadedLevel()->GetOuter());
 
-	//remove root level stream
+	//remove level stream
 	ensure(UEditorLevelUtils::RemoveLevelFromWorld(LevelStream->GetLoadedLevel()));
 
 	//cleanup empty folder by rebooting worldbrowser module

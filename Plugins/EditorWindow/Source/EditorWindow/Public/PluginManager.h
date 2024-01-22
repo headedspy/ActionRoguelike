@@ -18,7 +18,6 @@ protected:
 
 	// original levels and their replacement levels
 	static inline TMap<ULevelStreaming*, TSet<ULevelStreaming*>> ReplacementLevels;
-	//static inline TSet<TPair<ULevelStreaming*, ULevelStreaming*>> ReplacementLevels;
 
 	// actors and their replacement blueprint actors
 	static inline TMap<AActor*, AActor*> ReplacementActors;
@@ -31,6 +30,9 @@ public:
 
 	//returns level streams
 	static TSet<ULevelStreaming*> LoadFullLevel(UWorld* World, FTransform Transform, FString FolderName = "", FLinearColor Color = FLinearColor::White);
+
+	// remove all levels and actors
+	static void ClearAll();
 
 	// remove sublevel from editor world
 	static void RemoveSubLevelFromWorld(ULevelStreaming* LevelStream);
