@@ -871,6 +871,7 @@ void FEditorWindowModule::MoveAllActorsFromLevel(ULevelStreaming* LevelStream)
 	//rename all actors to unique names and move them to the persistent level
 	for (AActor* Actor : Actors)
 	{
+		//if (Actor->IsActorBeingDestroyed()) continue;
 		Actor->Rename(*(Actor->GetName() + "_" + LevelStream->GetName()), GEditor->GetEditorWorldContext().World()->PersistentLevel.Get());
 		GEditor->GetEditorWorldContext().World()->PersistentLevel.Get()->Actors.Add(Actor);
 	}
@@ -1253,6 +1254,12 @@ FReply FEditorWindowModule::MergeButtonClicked()
 {
 	// for each streamed level
 	const TArray<ULevelStreaming*> StreamedLevels = GWorld->GetStreamingLevels();
+
+	for (TPair<AActor*, AActor*> ReplacementActor : ReplacementActors)
+	{
+		//ReplacementActor.Key->Destroy();
+	}
+
 	for (ULevelStreaming* StreamedLevel : StreamedLevels)
 	{
 		//move all actors from the level
