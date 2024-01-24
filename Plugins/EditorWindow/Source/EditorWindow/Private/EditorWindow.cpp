@@ -871,7 +871,10 @@ void FEditorWindowModule::MoveAllActorsFromLevel(ULevelStreaming* LevelStream)
 	//rename all actors to unique names and move them to the persistent level
 	for (AActor* Actor : Actors)
 	{
-		//if (Actor->IsActorBeingDestroyed()) continue;
+		if (Actor->IsActorBeingDestroyed())
+		{
+			continue;
+		}
 		Actor->Rename(*(Actor->GetName() + "_" + LevelStream->GetName()), GEditor->GetEditorWorldContext().World()->PersistentLevel.Get());
 		GEditor->GetEditorWorldContext().World()->PersistentLevel.Get()->Actors.Add(Actor);
 	}
@@ -1255,15 +1258,46 @@ FReply FEditorWindowModule::MergeButtonClicked()
 	// for each streamed level
 	const TArray<ULevelStreaming*> StreamedLevels = GWorld->GetStreamingLevels();
 
-	for (TPair<AActor*, AActor*> ReplacementActor : ReplacementActors)
-	{
-		//ReplacementActor.Key->Destroy();
-	}
-
 	for (ULevelStreaming* StreamedLevel : StreamedLevels)
 	{
 		//move all actors from the level
+		if (StreamedLevel->GetCurrentState() == ULevelStreaming::ECurrentState::Removed ||
+			StreamedLevel->GetCurrentState() == ULevelStreaming::ECurrentState::Unloaded ||
+			!IsValid(StreamedLevel)) continue;
 		MoveAllActorsFromLevel(StreamedLevel);
+		//UnloadFullLevel(StreamedLevel);
+		//CleanupFolders();
+	}
+
+	//delete all actor spawnpoints via their tags
+	const TMap<FName, uint8*> DataTableRows = TagsDataTable->GetRowMap();
+	for (TPair<FName, uint8*> Row : DataTableRows)
+	{
+		// parse row data
+		FTagsStruct* RowData = (FTagsStruct*)Row.Value;
+
+		FName ActorTag = RowData->ActorTag;
+
+		TArray<AActor*> FoundActors;
+		UGameplayStatics::GetAllActorsWithTag(GEditor->GetEditorWorldContext().World(), ActorTag, FoundActors);
+
+		for (AActor* FoundActor : FoundActors)
+		{
+			FoundActor->Destroy();
+		}
+	}
+
+	for (TPair<AActor*, AActor*> ReplacementActor : ReplacementActors)
+	{
+		ReplacementActor.Key->Destroy();
+	}
+
+
+	for (ULevelStreaming* StreamedLevel : StreamedLevels)
+	{
+		if (StreamedLevel->GetCurrentState() == ULevelStreaming::ECurrentState::Removed ||
+			StreamedLevel->GetCurrentState() == ULevelStreaming::ECurrentState::Unloaded ||
+			!IsValid(StreamedLevel)) continue;
 		UnloadFullLevel(StreamedLevel);
 	}
 

@@ -40,4 +40,6 @@ public:
 	// fully remove level from the editor world
 	static void UnloadFullLevel(ULevelStreaming* LevelStream);
 
+	static void CleanupFolders();
+
 };

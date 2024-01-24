@@ -112,11 +112,26 @@ void PluginManager::RemoveSubLevelFromWorld(ULevelStreaming* LevelStream)
 
 void PluginManager::UnloadFullLevel(ULevelStreaming* LevelStream)
 {
-	FWorldBrowserModule& WBModule = FModuleManager::LoadModuleChecked<FWorldBrowserModule>("WorldBrowser");
-	TSharedPtr<FLevelCollectionModel> WorldModel = WBModule.SharedWorldModel((UWorld*)LevelStream->GetLoadedLevel()->GetOuter());
+	//FWorldBrowserModule& WBModule = FModuleManager::LoadModuleChecked<FWorldBrowserModule>("WorldBrowser");
+	//TSharedPtr<FLevelCollectionModel> WorldModel = WBModule.SharedWorldModel((UWorld*)LevelStream->GetLoadedLevel()->GetOuter());
 
 	//remove level stream
 	ensure(UEditorLevelUtils::RemoveLevelFromWorld(LevelStream->GetLoadedLevel()));
+
+	//cleanup empty folder by rebooting worldbrowser module
+	//WorldModel = nullptr;
+	//WBModule.ShutdownModule();
+	//WBModule.StartupModule();
+
+	//WBModule.OnBrowseWorld.Broadcast(GEditor->GetEditorWorldContext().World());
+
+	FEditorDelegates::RefreshLevelBrowser.Broadcast();
+}
+
+void PluginManager::CleanupFolders()
+{
+	FWorldBrowserModule& WBModule = FModuleManager::LoadModuleChecked<FWorldBrowserModule>("WorldBrowser");
+	TSharedPtr<FLevelCollectionModel> WorldModel = WBModule.SharedWorldModel(GEditor->GetEditorWorldContext().World());
 
 	//cleanup empty folder by rebooting worldbrowser module
 	WorldModel.Reset();
